@@ -1,2 +1,2 @@
 # clapp
-CLapp is a Windows application for making generative audiovisual demos based on OpenCL kernels
+CLapp is a Windows application for launching generative audiovisual demos based on OpenCL kernels

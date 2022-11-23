@@ -1,0 +1,16 @@
+BasedOnStyle : WebKit
+
+AlignAfterOpenBracket :	Align
+AllowAllArgumentsOnNextLine : true
+AlignConsecutiveAssignments : true
+AlignConsecutiveDeclarations : true
+# AlignConsecutiveMacros : true
+AlwaysBreakTemplateDeclarations : true
+BinPackArguments : true
+BinPackParameters : true
+BreakBeforeBinaryOperators : All
+BreakBeforeBraces : Allman
+ColumnLimit : 100
+# IndentPPDirectives: BeforeHash 
+NamespaceIndentation : All
+SpacesInParentheses : true
