@@ -18,8 +18,7 @@ using namespace clapp;
 
 namespace fs = rtl::filesystem;
 
-Context::Context( const rtl::opencl::device& device, rtl::string_view source,
-                  const rtl::uint32_t* cdata, rtl::size_t cdata_size )
+Context::Context( const rtl::opencl::device& device, rtl::string_view source )
 {
     context = rtl::opencl::context::create_with_current_ogl_context( device );
 
@@ -28,8 +27,6 @@ Context::Context( const rtl::opencl::device& device, rtl::string_view source,
     kernel_input     = program.create_kernel( "main_input" );
     kernel_video_out = program.create_kernel( "main_video_out" );
     kernel_audio_out = program.create_kernel( "main_audio_out" );
-
-    buffer_cdata = context.create_buffer_1d_uint( cdata_size, cdata );
 
     rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 
@@ -60,9 +57,6 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
                           buffer_state[buffer_state_output_index] );
 
     kernel_input.args()
-        .arg( buffer_cdata )
-        .arg( buffer_cdata.length() )
-
         .arg( buffer_state[1u - buffer_state_output_index] ) // current state
         .arg( buffer_state[buffer_state_output_index] ) // next state
 

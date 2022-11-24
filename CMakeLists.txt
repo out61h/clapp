@@ -81,6 +81,8 @@ if( MSVC )
             RTL_ENABLE_MEMSET=0
             RTL_ENABLE_OPENCL=1
 
+            CLAPP_ENABLE_ARCHITECT_MODE=0
+
             UNICODE
         )
 

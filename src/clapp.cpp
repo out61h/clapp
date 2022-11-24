@@ -19,8 +19,9 @@
 #include <clapp/context.hpp>
 #include <clapp/renderer.hpp>
 
-// TODO: Add switch for using embed code or reading it from file
+#if !CLAPP_ENABLE_ARCHITECT_MODE
 #include "p.h"
+#endif
 
 using rtl::application;
 using namespace rtl::keyboard;
@@ -33,12 +34,11 @@ using clapp::Renderer;
 #include <cl/opencl.h>
 
 // NOTE: Global variables is used for reducing the size of compiled code
-static Context*                g_context { nullptr };
-static Renderer*               g_renderer { nullptr };
-static application::params     g_app_params { 0 };
-static rtl::uint32_t           g_cdata[256] { 0 };
-static constexpr const wchar_t g_save_filename[] { L"clapp.save" };
-static constexpr const wchar_t g_auto_save_filename[] { L"clapp.auto.save" };
+static Context*            g_context { nullptr };
+static Renderer*           g_renderer { nullptr };
+static application::params g_app_params { 0 };
+static constexpr wchar_t   g_save_filename[] { L"clapp.save" };
+static constexpr wchar_t   g_auto_save_filename[] { L"clapp.auto.save" };
 
 int main( int, char*[] )
 {
@@ -61,12 +61,14 @@ int main( int, char*[] )
                 auto platforms = cl::platform::query_list();
                 auto devices   = cl::device::query_list( platforms );
 
-                // TODO: do we really need external cdata loading?
-                g_context = new Context(
-                    devices.front(),
-                    rtl::string_view( (const char*)program_i, (size_t)program_i_size ), g_cdata,
-                    256 );
-
+            // TODO: do we really need external cdata loading?
+#if !CLAPP_ENABLE_ARCHITECT_MODE
+                rtl::string_view source( (const char*)program_i, (size_t)program_i_size );
+#else
+            // TODO: load source from file
+#endif
+                // TODO: Compile source once and store compiled binaries in file.
+                g_context = new Context( devices.front(), source );
                 g_context->load( g_auto_save_filename );
             }
 
@@ -100,11 +102,15 @@ int main( int, char*[] )
                     // TODO: Display "LOAD WAS SUCCESSFULL" OSD message
                 }
             }
+#if CLAPP_ENABLE_ARCHITECT_MODE
             else if ( input.keys.pressed[keys::f5] )
             {
                 // TODO: reload program from external file
                 // TODO: Display "RELOAD WAS SUCCESSFULL" OSD message
             }
+#endif
+            // TODO: Ctrl+F8 = Reset state
+            // TODO: F10 = Show setup dialog
 
             g_context->update( input, output );
             g_renderer->draw();

@@ -19,9 +19,7 @@ namespace clapp
     class Context final
     {
     public:
-        Context( const rtl::opencl::device& device, rtl::string_view program,
-                 const rtl::uint32_t* cdata, size_t cdata_size );
-
+        Context( const rtl::opencl::device& device, rtl::string_view program );
         ~Context() = default;
 
         void init( const rtl::application::input& input, unsigned gl_texture );
@@ -44,9 +42,6 @@ namespace clapp
         rtl::opencl::kernel kernel_input;
         rtl::opencl::kernel kernel_audio_out;
         rtl::opencl::kernel kernel_video_out;
-
-        rtl::opencl::buffer buffer_cdata;
-        rtl::opencl::buffer buffer_tdata;
 
         rtl::array<rtl::opencl::buffer, 2> buffer_state;
         size_t                             buffer_state_output_index { 0 };
