@@ -42,15 +42,11 @@ static constexpr const wchar_t g_auto_save_filename[] { L"clapp.auto.save" };
 
 int main( int, char*[] )
 {
-    // TODO: VSYNC every 2nd, 3rd, 4th... frame
     // TODO: Fix sound sluttering after window resize or move
     // TODO: Add settings dialog to tune sound params and select OpenCL device
     // TODO: Remember last settings
     g_app_params.audio.samples_per_second  = 48000;
     g_app_params.audio.max_latency_samples = 16000;
-
-    // TODO: add OSD fps meter (min/max/avg,distribution by quantils)
-    // TODO: add OSD sound buffer overruns/underruns counters
 
     application::instance().run(
         L"clapp", g_app_params,
