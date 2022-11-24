@@ -16,13 +16,8 @@
 #include <rtl/sys/filesystem.hpp>
 #include <rtl/sys/opencl.hpp>
 
-#pragma warning( push )
-#pragma warning( disable : 4668 )
-#include <Windows.h>
-#include <gl/GL.h>
-#pragma warning( pop )
-
 #include <clapp/context.hpp>
+#include <clapp/renderer.hpp>
 
 // TODO: Add switch for using embed code or reading it from file
 #include "p.h"
@@ -33,14 +28,15 @@ using namespace rtl::keyboard;
 namespace cl = rtl::opencl;
 
 using clapp::Context;
+using clapp::Renderer;
 
 #include <cl/opencl.h>
 
 // NOTE: Global variables is used for reducing the size of compiled code
 static Context*                g_context { nullptr };
+static Renderer*               g_renderer { nullptr };
 static application::params     g_app_params { 0 };
 static rtl::uint32_t           g_cdata[256] { 0 };
-static GLuint                  g_texture { 0 };
 static constexpr const wchar_t g_save_filename[] { L"clapp.save" };
 static constexpr const wchar_t g_auto_save_filename[] { L"clapp.auto.save" };
 
@@ -53,10 +49,9 @@ int main( int, char*[] )
     g_app_params.audio.samples_per_second  = 48000;
     g_app_params.audio.max_latency_samples = 16000;
 
-    // TODO: add fps meter (with quantils)
-    // TODO: add sound buffer overrund/underruns counters
+    // TODO: add OSD fps meter (min/max/avg,distribution by quantils)
+    // TODO: add OSD sound buffer overruns/underruns counters
 
-    // TODO: RTL_OPENGL_CHECK macro?
     application::instance().run(
         L"clapp", g_app_params,
         // TODO: implement rtl::function template
@@ -64,7 +59,8 @@ int main( int, char*[] )
         {
             if ( !g_context )
             {
-                // TODO: select
+                // TODO: Do selection via settings dialog.
+                // TODO: Add Option to filter devices supported cl_khr_gl_sharing
                 // auto platforms = cl::platform::query_list_by_extension( "cl_khr_gl_sharing" );
                 auto platforms = cl::platform::query_list();
                 auto devices   = cl::device::query_list( platforms );
@@ -78,21 +74,11 @@ int main( int, char*[] )
                 g_context->load( g_auto_save_filename );
             }
 
-            // TODO: extract to renderer component
-            ::glViewport( 0, 0, input.screen.width, input.screen.height );
-            ::glDisable( GL_LIGHTING );
-            ::glEnable( GL_TEXTURE_2D );
-            ::glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
+            if ( !g_renderer )
+                g_renderer = new Renderer();
 
-            if ( ::glIsTexture( g_texture ) )
-                ::glDeleteTextures( 1, &g_texture );
-
-            ::glGenTextures( 1, &g_texture );
-            ::glBindTexture( GL_TEXTURE_2D, g_texture );
-            ::glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)input.screen.width,
-                            (GLsizei)input.screen.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr );
-
-            g_context->init( input, g_texture );
+            g_renderer->init( input.screen.width, input.screen.height );
+            g_context->init( input, g_renderer->texture() );
         },
         []( const application::input& input, application::output& output )
         {
@@ -108,53 +94,24 @@ int main( int, char*[] )
             {
                 if ( g_context->save( g_save_filename ) )
                 {
-                    // TODO: Display "SAVE SUCCESS" message
+                    // TODO: Display "SAVE WAS SUCCESSFULL" OSD message
                 }
             }
             else if ( input.keys.pressed[keys::f3] )
             {
                 if ( g_context->load( g_save_filename ) )
                 {
-                    // TODO: Display "LOAD SUCCESS" message
+                    // TODO: Display "LOAD WAS SUCCESSFULL" OSD message
                 }
             }
             else if ( input.keys.pressed[keys::f5] )
             {
                 // TODO: reload program from external file
+                // TODO: Display "RELOAD WAS SUCCESSFULL" OSD message
             }
 
             g_context->update( input, output );
-
-            // TODO: extract to renderer component
-            // TODO: Use OpenGL 3.x API with shaders
-            ::glClear( GL_COLOR_BUFFER_BIT );
-
-            ::glMatrixMode( GL_PROJECTION );
-            ::glLoadIdentity();
-
-            ::glBindTexture( GL_TEXTURE_2D, g_texture );
-            ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-            ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-            ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-            ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-
-            ::glOrtho( 0.0, input.screen.width, 0.0, input.screen.height, -1.0, 1.0 );
-
-            ::glMatrixMode( GL_MODELVIEW );
-            ::glLoadIdentity();
-            ::glBegin( GL_QUADS );
-            ::glColor3f( 1.0f, 1.0f, 1.0f );
-            ::glTexCoord2f( 0.f, 0.f );
-            ::glVertex2i( 0, input.screen.height );
-            ::glTexCoord2f( 1.f, 0.f );
-            ::glVertex2i( input.screen.width, input.screen.height );
-            ::glTexCoord2f( 1.f, 1.f );
-            ::glVertex2i( input.screen.width, 0 );
-            ::glTexCoord2f( 0.f, 1.f );
-            ::glVertex2i( 0, 0 );
-            ::glEnd();
-
-            ::glFlush();
+            g_renderer->draw();
 
             return application::action::none;
         },
@@ -162,6 +119,7 @@ int main( int, char*[] )
         {
             g_context->save( g_auto_save_filename );
             delete g_context;
+            delete g_renderer;
         } );
 
     return 0;
