@@ -20,21 +20,20 @@ namespace clapp
     {
     public:
         Context( const rtl::opencl::device& device, rtl::string_view program,
-                 const rtl::uint32_t* cdata, size_t cdata_size, rtl::vector<rtl::uint32_t> state );
+                 const rtl::uint32_t* cdata, size_t cdata_size );
 
         ~Context() = default;
 
         void init( const rtl::application::input& input, unsigned gl_texture );
         void update( const rtl::application::input& input, rtl::application::output& output );
 
-        rtl::vector<rtl::uint32_t> save();
-
-        void load( const rtl::vector<rtl::uint32_t>& state );
+        bool save( const wchar_t* filename );
+        bool load( const wchar_t* filename );
 
     private:
         static constexpr size_t keys_count = 256;
 
-        // TODO: explain calculation
+        // TODO: Use common (with OpenCL program) constants definitions
         static constexpr size_t state_buffer_size
             = ( 2560 / 4 ) * ( 1440 / 4 ) + 256 * 256 + 256 * 256;
 

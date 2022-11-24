@@ -13,6 +13,7 @@
 
 #include <rtl/sys/application.hpp>
 #include <rtl/sys/debug.hpp>
+#include <rtl/sys/filesystem.hpp>
 #include <rtl/sys/opencl.hpp>
 
 #pragma warning( push )
@@ -36,22 +37,24 @@ using clapp::Context;
 #include <cl/opencl.h>
 
 // NOTE: Global variables is used for reducing the size of compiled code
-static Context*            g_context { nullptr };
-static application::params g_app_params { 0 };
-static rtl::uint32_t       g_cdata[256] { 0 };
-static GLuint              g_texture { 0 };
+static Context*                g_context { nullptr };
+static application::params     g_app_params { 0 };
+static rtl::uint32_t           g_cdata[256] { 0 };
+static GLuint                  g_texture { 0 };
+static constexpr const wchar_t g_save_filename[] { L"clapp.save" };
+static constexpr const wchar_t g_auto_save_filename[] { L"clapp.auto.save" };
 
 int main( int, char*[] )
 {
+    // TODO: VSYNC every 2nd, 3rd, 4th... frame
     // TODO: Fix sound sluttering after window resize or move
     // TODO: Add settings dialog to tune sound params and select OpenCL device
+    // TODO: Remember last settings
     g_app_params.audio.samples_per_second  = 48000;
     g_app_params.audio.max_latency_samples = 16000;
 
-    // TODO: VSYNC every 2nd, 3rd, 4th... frame
     // TODO: add fps meter (with quantils)
     // TODO: add sound buffer overrund/underruns counters
-    // TODO: load state from file
 
     // TODO: RTL_OPENGL_CHECK macro?
     application::instance().run(
@@ -70,9 +73,12 @@ int main( int, char*[] )
                 g_context = new Context(
                     devices.front(),
                     rtl::string_view( (const char*)program_i, (size_t)program_i_size ), g_cdata,
-                    256, {} );
+                    256 );
+
+                g_context->load( g_auto_save_filename );
             }
 
+            // TODO: extract to renderer component
             ::glViewport( 0, 0, input.screen.width, input.screen.height );
             ::glDisable( GL_LIGHTING );
             ::glEnable( GL_TEXTURE_2D );
@@ -94,21 +100,23 @@ int main( int, char*[] )
             {
                 return application::action::close;
             }
-            // TODO: fix window menu call after pressing F10
             else if ( input.keys.pressed[keys::f11] )
             {
                 return application::action::toggle_fullscreen;
             }
             else if ( input.keys.pressed[keys::f2] )
             {
-                auto state = g_context->save();
-                // TODO: save to file
+                if ( g_context->save( g_save_filename ) )
+                {
+                    // TODO: Display "SAVE SUCCESS" message
+                }
             }
             else if ( input.keys.pressed[keys::f3] )
             {
-                // TODO: load from file
-                rtl::vector<rtl::uint32_t> state;
-                g_context->load( state );
+                if ( g_context->load( g_save_filename ) )
+                {
+                    // TODO: Display "LOAD SUCCESS" message
+                }
             }
             else if ( input.keys.pressed[keys::f5] )
             {
@@ -117,7 +125,8 @@ int main( int, char*[] )
 
             g_context->update( input, output );
 
-            // TODO: OpenGL 2.0
+            // TODO: extract to renderer component
+            // TODO: Use OpenGL 3.x API with shaders
             ::glClear( GL_COLOR_BUFFER_BIT );
 
             ::glMatrixMode( GL_PROJECTION );
@@ -148,12 +157,12 @@ int main( int, char*[] )
             ::glFlush();
 
             return application::action::none;
+        },
+        []()
+        {
+            g_context->save( g_auto_save_filename );
+            delete g_context;
         } );
-
-    // TODO: save to file
-
-    // TODO: add app terminate callback
-    delete g_context;
 
     return 0;
 }

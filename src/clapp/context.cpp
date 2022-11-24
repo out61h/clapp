@@ -12,23 +12,17 @@
 
 #include <rtl/algorithm.hpp>
 #include <rtl/limits.hpp>
-
-#pragma warning( push )
-#pragma warning( disable : 4668 )
-#define NOMINMAX
-#include <Windows.h>
-#include <gl/GL.h>
-#pragma warning( pop )
+#include <rtl/sys/filesystem.hpp>
 
 using namespace clapp;
 
+namespace fs = rtl::filesystem;
+
 Context::Context( const rtl::opencl::device& device, rtl::string_view source,
-                  const rtl::uint32_t* cdata, rtl::size_t cdata_size,
-                  rtl::vector<rtl::uint32_t> state )
+                  const rtl::uint32_t* cdata, rtl::size_t cdata_size )
 {
     context = rtl::opencl::context::create_with_current_ogl_context( device );
 
-    // TODO: build once
     program = context.build_program( source );
 
     kernel_input     = program.create_kernel( "main_input" );
@@ -37,9 +31,7 @@ Context::Context( const rtl::opencl::device& device, rtl::string_view source,
 
     buffer_cdata = context.create_buffer_1d_uint( cdata_size, cdata );
 
-    // TODO: check using version number and notify user if mismatch detected
-    if ( state.size() != state_buffer_size )
-        state = rtl::vector<rtl::uint32_t>( state_buffer_size, 0 );
+    rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 
     for ( auto& buffer : buffer_state )
         buffer = context.create_buffer_1d_uint( state.size(), state.data() );
@@ -63,7 +55,7 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
 {
     context.enqueue_copy( input.keys.state, buffer_keys, buffer_keys.length() );
 
-    // TODO: remove; do values copying of unchanged state cells inside kernels
+    // TODO: remove; do copying of unchanged cells inside kernels
     context.enqueue_copy( buffer_state[1u - buffer_state_output_index],
                           buffer_state[buffer_state_output_index] );
 
@@ -135,25 +127,52 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
     audio_samples_generated += input.audio.samples_per_frame;
 }
 
-rtl::vector<rtl::uint32_t> Context::save()
+bool Context::save( const wchar_t* filename )
 {
     rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
 
-    rtl::vector<rtl::uint32_t> result( buffer.length(), 0 );
-    context.enqueue_copy( buffer, result.data(), buffer.length() );
+    rtl::vector<rtl::uint32_t> state( buffer.length(), 0 );
+    context.enqueue_copy( buffer, state.data(), buffer.length() );
     context.wait();
 
-    return result;
+    // TODO: save to tmp file, than rename
+    auto f
+        = fs::file::open( filename, fs::file::access::write_only, fs::file::mode::create_always );
+    if ( !f )
+        return false;
+
+    const unsigned bytes_to_write = state.size() * sizeof( rtl::uint32_t );
+
+    return f.write( state.data(), bytes_to_write ) == bytes_to_write;
 }
 
-void Context::load( const rtl::vector<rtl::uint32_t>& state )
+bool Context::load( const wchar_t* filename )
 {
+    auto f = fs::file::open( filename, fs::file::access::read_only, fs::file::mode::open_existing );
+    if ( !f )
+        return false;
+
+    f.seek( 0, fs::file::position::end );
+
+    const size_t cells_count = static_cast<size_t>( f.tell() ) / sizeof( rtl::uint32_t );
+
     // TODO: check using version number and notify user if mismatch detected
-    if ( state.size() != state_buffer_size )
-        return;
+    if ( cells_count != state_buffer_size )
+        return false;
+
+    rtl::vector<rtl::uint32_t> state( cells_count );
+
+    f.seek( 0, fs::file::position::begin );
+
+    const unsigned bytes_to_read = cells_count * sizeof( rtl::uint32_t );
+
+    if ( f.read( state.data(), bytes_to_read ) != bytes_to_read )
+        return false;
 
     rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
 
     context.enqueue_copy( state.data(), buffer, buffer.length() );
     context.wait();
+
+    return true;
 }
