@@ -28,7 +28,8 @@ aux_source_directory(src/ SOURCES)
 aux_source_directory(src/clapp SOURCES)
 
 add_executable(${PROJECT_NAME} 
-    # res/resource.rc
+    ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
+    res/clapp.rc
     ${SOURCES}
 )
 
@@ -46,6 +47,21 @@ target_include_directories(${PROJECT_NAME}
 )
 
 if( MSVC )
+    add_custom_command(
+        OUTPUT
+            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
+        COMMAND
+            CL /P /C /D PREPROCESS ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.c 
+        MAIN_DEPENDENCY
+            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.c
+        OUTPUT
+            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
+        DEPENDS 
+            ${PROJECT_NAME} 
+        COMMENT 
+            "Preprocessing OpenCL program"
+    )  
+
     RemoveDebugCXXFlag("/RTC1")
     RemoveCXXFlag("/EHsc")
     message("MSVC flags: ${CMAKE_CXX_FLAGS}")
@@ -75,6 +91,7 @@ if( MSVC )
             RTL_ENABLE_APP_OPENGL=1
             RTL_ENABLE_APP_OPENGL_VSYNC=1
             RTL_ENABLE_APP_RESIZE=1
+            RTL_ENABLE_APP_RESOURCES=1
             RTL_ENABLE_APP_SCREEN_BUFFER=0
             RTL_ENABLE_APP_SINGLETON=1
             RTL_ENABLE_HEAP=1

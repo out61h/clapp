@@ -19,9 +19,7 @@
 #include <clapp/context.hpp>
 #include <clapp/renderer.hpp>
 
-#if !CLAPP_ENABLE_ARCHITECT_MODE
-#include "p.h"
-#endif
+#include <clapp.h>
 
 using rtl::application;
 using namespace rtl::keyboard;
@@ -61,13 +59,17 @@ int main( int, char*[] )
                 auto platforms = cl::platform::query_list();
                 auto devices   = cl::device::query_list( platforms );
 
-            // TODO: do we really need external cdata loading?
 #if !CLAPP_ENABLE_ARCHITECT_MODE
-                rtl::string_view source( (const char*)program_i, (size_t)program_i_size );
+                auto program = input.resources.open( FILE, CLAPP_ID_OPENCL_PROGRAM );
+
+                rtl::string_view source( static_cast<const char*>( program.data() ),
+                                         program.size() );
 #else
-            // TODO: load source from file
+                // TODO: load source from file
+                rtl::string_view source;
 #endif
-                // TODO: Compile source once and store compiled binaries in file.
+
+                // TODO: Compile source once and cache compiled binaries in the file.
                 g_context = new Context( devices.front(), source );
                 g_context->load( g_auto_save_filename );
             }
