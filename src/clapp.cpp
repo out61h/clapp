@@ -13,7 +13,6 @@
 
 #include <rtl/sys/application.hpp>
 #include <rtl/sys/debug.hpp>
-#include <rtl/sys/filesystem.hpp>
 #include <rtl/sys/opencl.hpp>
 
 #include <clapp/context.hpp>
@@ -29,14 +28,13 @@ namespace cl = rtl::opencl;
 using clapp::Context;
 using clapp::Renderer;
 
-#include <cl/opencl.h>
-
 // NOTE: Global variables is used for reducing the size of compiled code
 static Context*            g_context { nullptr };
 static Renderer*           g_renderer { nullptr };
 static application::params g_app_params { 0 };
 static constexpr wchar_t   g_save_filename[] { L"clapp.save" };
 static constexpr wchar_t   g_auto_save_filename[] { L"clapp.auto.save" };
+static constexpr wchar_t   g_program_filename[] { L"clapp.cl" };
 
 int main( int, char*[] )
 {
@@ -59,20 +57,20 @@ int main( int, char*[] )
                 auto platforms = cl::platform::query_list();
                 auto devices   = cl::device::query_list( platforms );
 
+                // TODO: Compile source once and cache compiled binaries in the file.
+                // TODO: Async program loading
+                g_context = new Context( devices.front() );
 #if !CLAPP_ENABLE_ARCHITECT_MODE
                 auto program = input.resources.open( FILE, CLAPP_ID_OPENCL_PROGRAM );
 
                 rtl::string_view source( static_cast<const char*>( program.data() ),
                                          program.size() );
-#else
-                // TODO: load source from file
-                rtl::string_view source; // clapp.cl
-#endif
 
-                // TODO: Compile source once and cache compiled binaries in the file.
-                // TODO: Async compiling
-                g_context = new Context( devices.front(), source );
-                g_context->load( g_auto_save_filename );
+                g_context->load_program( source );
+#else
+                g_context->load_program( g_program_filename );
+#endif
+                g_context->load_state( g_auto_save_filename );
             }
 
             if ( !g_renderer )
@@ -93,14 +91,14 @@ int main( int, char*[] )
             }
             else if ( input.keys.pressed[keys::f2] )
             {
-                if ( g_context->save( g_save_filename ) )
+                if ( g_context->save_state( g_save_filename ) )
                 {
                     // TODO: Display "SAVE WAS SUCCESSFULL" OSD message
                 }
             }
             else if ( input.keys.pressed[keys::f3] )
             {
-                if ( g_context->load( g_save_filename ) )
+                if ( g_context->load_state( g_save_filename ) )
                 {
                     // TODO: Display "LOAD WAS SUCCESSFULL" OSD message
                 }
@@ -108,13 +106,14 @@ int main( int, char*[] )
 #if CLAPP_ENABLE_ARCHITECT_MODE
             else if ( input.keys.pressed[keys::f5] )
             {
-                // TODO: reload program from external file
+                g_context->load_program( g_program_filename );
                 // TODO: Display "RELOAD WAS SUCCESSFULL" OSD message
             }
 #endif
             else if ( input.keys.pressed[keys::f8] && input.keys.state[keys::control] )
             {
-                g_context->reset();
+                g_context->reset_state();
+                // TODO: Display "STATE RESET" OSD message
             }
             // TODO: F10 = Show setup dialog
 
@@ -125,7 +124,7 @@ int main( int, char*[] )
         },
         []()
         {
-            g_context->save( g_auto_save_filename );
+            g_context->save_state( g_auto_save_filename );
             delete g_context;
             delete g_renderer;
         } );

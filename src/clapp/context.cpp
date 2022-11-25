@@ -18,16 +18,10 @@ using namespace clapp;
 
 namespace fs = rtl::filesystem;
 
-Context::Context( const rtl::opencl::device& device, rtl::string_view source )
+Context::Context( const rtl::opencl::device& device )
 {
     // cppcheck-suppress useInitializationList
     context = rtl::opencl::context::create_with_current_ogl_context( device );
-
-    program = context.build_program( source );
-
-    kernel_input     = program.create_kernel( "main_input" );
-    kernel_video_out = program.create_kernel( "main_video_out" );
-    kernel_audio_out = program.create_kernel( "main_audio_out" );
 
     rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 
@@ -35,6 +29,30 @@ Context::Context( const rtl::opencl::device& device, rtl::string_view source )
         buffer = context.create_buffer_1d_uint( state.size(), state.data() );
 
     buffer_keys = context.create_buffer_1d_uint( keys_count );
+}
+
+void Context::load_program( const wchar_t* filename )
+{
+    using rtl::filesystem::file;
+
+    file f = file::open( filename, file::access::read_only, file::mode::open_existing );
+    f.seek( 0, file::position::end );
+    const size_t f_size = static_cast<size_t>( f.tell() );
+    f.seek( 0, file::position::begin );
+
+    rtl::string source( f_size, 0 );
+    f.read( source.data(), f_size );
+
+    load_program( source );
+}
+
+void Context::load_program( rtl::string_view source )
+{
+    program = context.build_program( source );
+
+    kernel_input     = program.create_kernel( "main_input" );
+    kernel_video_out = program.create_kernel( "main_video_out" );
+    kernel_audio_out = program.create_kernel( "main_audio_out" );
 }
 
 void Context::init( [[maybe_unused]] const rtl::application::input& input, unsigned gl_texture )
@@ -122,7 +140,7 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
     audio_samples_generated += input.audio.samples_per_frame;
 }
 
-bool Context::save( const wchar_t* filename )
+bool Context::save_state( const wchar_t* filename )
 {
     rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
 
@@ -141,7 +159,7 @@ bool Context::save( const wchar_t* filename )
     return f.write( state.data(), bytes_to_write ) == bytes_to_write;
 }
 
-bool Context::load( const wchar_t* filename )
+bool Context::load_state( const wchar_t* filename )
 {
     auto f = fs::file::open( filename, fs::file::access::read_only, fs::file::mode::open_existing );
     if ( !f )
@@ -172,7 +190,7 @@ bool Context::load( const wchar_t* filename )
     return true;
 }
 
-void Context::reset()
+void Context::reset_state()
 {
     rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 

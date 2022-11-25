@@ -19,15 +19,18 @@ namespace clapp
     class Context final
     {
     public:
-        Context( const rtl::opencl::device& device, rtl::string_view program );
+        explicit Context( const rtl::opencl::device& device );
         ~Context() = default;
 
         void init( const rtl::application::input& input, unsigned gl_texture );
         void update( const rtl::application::input& input, rtl::application::output& output );
 
-        bool save( const wchar_t* filename );
-        bool load( const wchar_t* filename );
-        void reset();
+        void load_program( const wchar_t* filename );
+        void load_program( rtl::string_view program );
+
+        bool save_state( const wchar_t* filename );
+        bool load_state( const wchar_t* filename );
+        void reset_state();
 
     private:
         static constexpr size_t keys_count = 256;

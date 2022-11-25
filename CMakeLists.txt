@@ -28,8 +28,8 @@ aux_source_directory(src/ SOURCES)
 aux_source_directory(src/clapp SOURCES)
 
 add_executable(${PROJECT_NAME} 
-    ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
-    res/clapp.rc
+    ${CMAKE_CURRENT_LIST_DIR}/res/cl/program.i
+    ${CMAKE_CURRENT_LIST_DIR}/res/clapp.rc
     ${SOURCES}
 )
 
@@ -49,16 +49,14 @@ target_include_directories(${PROJECT_NAME}
 if( MSVC )
     add_custom_command(
         OUTPUT
-            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
+            ${CMAKE_CURRENT_LIST_DIR}/res/cl/program.i
         COMMAND
-            CL /P /C /D PREPROCESS ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.c 
-        MAIN_DEPENDENCY
-            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.c
-        OUTPUT
-            ${CMAKE_CURRENT_SOURCE_DIR}/res/cl/program.i
+            CL /P /C /D PREPROCESS program.c
         DEPENDS 
-            ${PROJECT_NAME} 
-        COMMENT 
+            ${CMAKE_CURRENT_LIST_DIR}/res/clapp.rc
+        WORKING_DIRECTORY 
+            ${CMAKE_CURRENT_LIST_DIR}/res/cl
+        COMMENT
             "Preprocessing OpenCL program"
     )  
 

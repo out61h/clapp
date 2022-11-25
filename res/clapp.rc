@@ -12,4 +12,9 @@
 
 CLAPP_ID_ICON           ICON        "clapp.ico"
 CLAPP_ID_MANIFEST       MANIFEST    "manifest.xml"
+
+#if !CLAPP_ENABLE_ARCHITECT_MODE
+
 CLAPP_ID_OPENCL_PROGRAM FILE        "cl/program.i"
+
+#endif
