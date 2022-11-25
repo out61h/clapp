@@ -20,6 +20,7 @@ namespace fs = rtl::filesystem;
 
 Context::Context( const rtl::opencl::device& device, rtl::string_view source )
 {
+    // cppcheck-suppress useInitializationList
     context = rtl::opencl::context::create_with_current_ogl_context( device );
 
     program = context.build_program( source );
@@ -154,7 +155,7 @@ bool Context::load( const wchar_t* filename )
     if ( cells_count != state_buffer_size )
         return false;
 
-    rtl::vector<rtl::uint32_t> state( cells_count );
+    rtl::vector<rtl::uint32_t> state( cells_count, 0 );
 
     f.seek( 0, fs::file::position::begin );
 
@@ -169,4 +170,14 @@ bool Context::load( const wchar_t* filename )
     context.wait();
 
     return true;
+}
+
+void Context::reset()
+{
+    rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
+
+    rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
+
+    context.enqueue_copy( state.data(), buffer, buffer.length() );
+    context.wait();
 }

@@ -66,10 +66,11 @@ int main( int, char*[] )
                                          program.size() );
 #else
                 // TODO: load source from file
-                rtl::string_view source;
+                rtl::string_view source; // clapp.cl
 #endif
 
                 // TODO: Compile source once and cache compiled binaries in the file.
+                // TODO: Async compiling
                 g_context = new Context( devices.front(), source );
                 g_context->load( g_auto_save_filename );
             }
@@ -111,7 +112,10 @@ int main( int, char*[] )
                 // TODO: Display "RELOAD WAS SUCCESSFULL" OSD message
             }
 #endif
-            // TODO: Ctrl+F8 = Reset state
+            else if ( input.keys.pressed[keys::f8] && input.keys.state[keys::control] )
+            {
+                g_context->reset();
+            }
             // TODO: F10 = Show setup dialog
 
             g_context->update( input, output );

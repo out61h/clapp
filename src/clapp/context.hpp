@@ -27,6 +27,7 @@ namespace clapp
 
         bool save( const wchar_t* filename );
         bool load( const wchar_t* filename );
+        void reset();
 
     private:
         static constexpr size_t keys_count = 256;
