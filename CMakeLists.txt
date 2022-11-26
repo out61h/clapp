@@ -28,10 +28,11 @@ aux_source_directory(src/ SOURCES)
 aux_source_directory(src/clapp SOURCES)
 
 add_executable(${PROJECT_NAME} 
-    ${CMAKE_CURRENT_LIST_DIR}/res/cl/program.i
     ${CMAKE_CURRENT_LIST_DIR}/res/clapp.rc
     ${SOURCES}
 )
+
+add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/res/cl )
 
 target_link_libraries(${PROJECT_NAME} 
         ${OpenCL_LIBRARIES} 
@@ -47,19 +48,6 @@ target_include_directories(${PROJECT_NAME}
 )
 
 if( MSVC )
-    add_custom_command(
-        OUTPUT
-            ${CMAKE_CURRENT_LIST_DIR}/res/cl/program.i
-        COMMAND
-            CL /P /C /D PREPROCESS program.c
-        DEPENDS 
-            ${CMAKE_CURRENT_LIST_DIR}/res/clapp.rc
-        WORKING_DIRECTORY 
-            ${CMAKE_CURRENT_LIST_DIR}/res/cl
-        COMMENT
-            "Preprocessing OpenCL program"
-    )  
-
     RemoveDebugCXXFlag("/RTC1")
     RemoveCXXFlag("/EHsc")
     message("MSVC flags: ${CMAKE_CXX_FLAGS}")
