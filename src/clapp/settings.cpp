@@ -70,6 +70,48 @@ namespace format
 }
 #pragma pack( pop )
 
+static void center_window( HWND dialog_window )
+{
+    [[maybe_unused]] BOOL result;
+
+    HWND parent_window;
+    RECT dialog_rect, parent_rect;
+
+    if ( ( parent_window = ::GetParent( dialog_window ) ) != nullptr )
+    {
+        result = ::GetWindowRect( dialog_window, &dialog_rect );
+        RTL_WINAPI_CHECK( result );
+
+        result = ::GetWindowRect( parent_window, &parent_rect );
+        RTL_WINAPI_CHECK( result );
+
+        const int width  = dialog_rect.right - dialog_rect.left;
+        const int height = dialog_rect.bottom - dialog_rect.top;
+
+        int cx = ( ( parent_rect.right - parent_rect.left ) - width ) / 2 + parent_rect.left;
+        int cy = ( ( parent_rect.bottom - parent_rect.top ) - height ) / 2 + parent_rect.top;
+
+        const int screen_width  = ::GetSystemMetrics( SM_CXSCREEN );
+        const int screen_height = ::GetSystemMetrics( SM_CYSCREEN );
+
+        // Make sure that the dialog box never moves outside of the screen
+        if ( cx < 0 )
+            cx = 0;
+
+        if ( cy < 0 )
+            cy = 0;
+
+        if ( cx + width > screen_width )
+            cx = screen_width - width;
+
+        if ( cy + height > screen_height )
+            cy = screen_height - height;
+
+        result = ::MoveWindow( dialog_window, cx, cy, width, height, FALSE );
+        RTL_WINAPI_CHECK( result );
+    }
+}
+
 class Settings::Impl
 {
 public:
@@ -169,6 +211,8 @@ public:
         init_audio_buffer_size( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS );
         init_opencl_device( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
         update_max_latency( hwnd );
+
+        center_window( hwnd );
     }
 
     void free()
@@ -378,36 +422,6 @@ public:
             ::SetWindowLongPtrW( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( that ) );
 
             that->init( hwnd );
-
-#if 0 // TODO: center
-        CenterWindow( hWndDlg );
-
-        RECT rect;
-        RTL_WIN32_ASSERT( ::GetWindowRect( hWndDlg, &rect ) );
-        HWND parent = ::GetParent( hWndDlg );
-        RTL_WIN32_ASSERT( ::GetWindowRect( hWndDlg, &rect ) );
-
-        if ( parent )
-        {
-            RECT parent_rect;
-            RTL_WIN32_ASSERT( ::GetWindowRect( parent, &parent_rect ) );
-
-            RECT rc;
-            RTL_WIN32_ASSERT( ::CopyRect( &rc, &parent_rect ) );
-
-            RTL_WIN32_ASSERT( ::OffsetRect( &rect, -rect.left, -rect.top ) );
-
-            RTL_WIN32_ASSERT( ::OffsetRect( &rc, -rc.left, -rc.top ) );
-
-            RTL_WIN32_ASSERT( ::OffsetRect( &rc, -rect.right, -rect.bottom ) );
-
-            RTL_WIN32_ASSERT( ::SetWindowPos( hWndDlg, HWND_TOP,
-                                              parent_rect.left + ( rc.right / 2 ),
-                                              parent_rect.top + ( rc.bottom / 2 ), 0, 0,
-                                              SWP_NOSIZE /* | SWP_NOZORDER */ | SWP_SHOWWINDOW ) );
-        }
-#endif
-
             break;
         }
         }
