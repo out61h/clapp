@@ -19,9 +19,15 @@
 #include <rtl/sys/filesystem.hpp>
 #include <rtl/sys/opencl.hpp>
 
+// HACK: Shortcut to get RTL_WINAPI_CHECK macro definition. I plan to move all Windows-specific code
+// to RTL library, so such solution is acceptable for a while.
 #pragma warning( push )
 #pragma warning( disable : 4668 )
-#include <Windows.h>
+#define RTL_IMPLEMENTATION
+#define RTL_IMPL_DISABLE_WINDOWS_DEFS_FILTER
+#include <rtl/sys/impl/win.hpp>
+#undef RTL_IMPLEMENTATION
+#undef RTL_IMPL_DISABLE_WINDOWS_DEFS_FILTER
 #pragma warning( pop )
 
 using namespace clapp;
@@ -73,7 +79,9 @@ public:
     rtl::string              target_device_name;
     unsigned                 target_monitor_frame_rate { 0 };
 
-    int banner_phase { 0 };
+    HWND dialog_window { nullptr };
+    UINT dialog_timer { 0 };
+    int  banner_phase { 0 };
 
     void init_audio_rate( HWND hwnd, int control_id )
     {
@@ -146,15 +154,29 @@ public:
 
     void init( HWND hwnd )
     {
-        // NOTE: Without this, the dialog will not appear on top of the fullscreen window!
-        ::SetWindowPos( hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+        // NOTE: The dialog will not appear on top of the fullscreen window without this code!
+        [[maybe_unused]] BOOL result = ::SetWindowPos( hwnd, HWND_TOP, 0, 0, 0, 0,
+                                                       SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
+        RTL_WINAPI_CHECK( result );
+
         ::SetForegroundWindow( hwnd );
         ::SetFocus( hwnd );
+
+        dialog_window = hwnd;
 
         init_audio_rate( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE );
         init_audio_buffer_size( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS );
         init_opencl_device( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
         update_max_latency( hwnd );
+    }
+
+    void free()
+    {
+        [[maybe_unused]] MMRESULT result = ::timeKillEvent( dialog_timer );
+        RTL_ASSERT( result == TIMERR_NOERROR );
+
+        dialog_timer  = 0;
+        dialog_window = nullptr;
     }
 
     void update_max_latency( HWND hwnd )
@@ -169,10 +191,13 @@ public:
         const LONG_PTR buffers_value = ::SendDlgItemMessageW(
             hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS, CB_GETITEMDATA, (WPARAM)buffers_index, 0 );
 
-        const int audio_latency
+        const int audio_latency_ms
             = static_cast<int>( 1000 / target_monitor_frame_rate * buffers_value );
+        const int audio_latency_samples
+            = static_cast<int>( rate_value / target_monitor_frame_rate * buffers_value );
         {
-            const rtl::wstring text = rtl::to_wstring( audio_latency ) + L" ms";
+            const rtl::wstring text = rtl::to_wstring( audio_latency_ms ) + L" ms / "
+                + rtl::to_wstring( audio_latency_samples ) + L" samples";
 
             ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_AUDIO_LATENCY, text.c_str() );
         }
@@ -182,55 +207,93 @@ public:
             ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_FRAMERATE, text.c_str() );
         }
 
-        ::SetTimer( hwnd, 1, static_cast<UINT>( 1000 / target_monitor_frame_rate ),
-                    0 ); // TODO: check result
+        [[maybe_unused]] MMRESULT result;
 
-        // TODO: kill timer?
+        if ( dialog_timer )
+        {
+            result = ::timeKillEvent( dialog_timer );
+            RTL_ASSERT( result == TIMERR_NOERROR );
+        }
+
+        dialog_timer
+            = ::timeSetEvent( static_cast<UINT>( 1000 / target_monitor_frame_rate ), 0,
+                              &Impl::on_timer, reinterpret_cast<DWORD_PTR>( this ),
+                              TIME_PERIODIC | TIME_CALLBACK_FUNCTION | TIME_KILL_SYNCHRONOUS );
+        RTL_ASSERT( dialog_timer != 0 );
+    }
+
+    static void CALLBACK on_timer( UINT, UINT, DWORD_PTR dwUser, DWORD_PTR, DWORD_PTR )
+    {
+        Impl* impl = reinterpret_cast<Impl*>( dwUser );
+        impl->update_banner( impl->dialog_window );
     }
 
     void update_banner( HWND hwnd )
     {
-        // TODO: animation freezes when combobox is opening
+        HWND banner = ::GetDlgItem( hwnd, CLAPP_ID_CONTROL_BANNER );
+        RTL_WINAPI_CHECK( banner != nullptr );
 
-        HWND banner = ::GetDlgItem( hwnd, CLAPP_ID_CONTROL_BANNER ); // TODO: check result
-        ::InvalidateRect( banner, nullptr, FALSE ); // TODO: check result
-        banner_phase += 11;
-        ::SetTimer( hwnd, 1, static_cast<UINT>( 1000 / target_monitor_frame_rate ),
-                    0 ); // TODO: check result
+        HDC dc = ::GetWindowDC( banner );
+        RTL_WINAPI_CHECK( dc != nullptr );
 
-        // TODO: kill timer?
+        [[maybe_unused]] BOOL result;
+
+        RECT rect;
+        result = ::GetClientRect( banner, &rect );
+        RTL_WINAPI_CHECK( result );
+
+        draw_banner( dc, rect );
+
+        ::ReleaseDC( banner, dc );
     }
 
-    void draw_banner( DRAWITEMSTRUCT* dis )
+    void draw_banner( HDC banner_dc, const RECT& banner_rect )
     {
-        constexpr int step   = 20;
-        constexpr int size   = 18;
-        int           offset = banner_phase; // TODO: simplify
+        constexpr int step            = 20;
+        constexpr int size            = 18;
+        constexpr int period          = 10;
+        constexpr int half_period     = period / 2;
+        constexpr int denominator     = 256;
+        constexpr int max_color_value = 255;
+        constexpr int speed_factor    = 3;
 
-        const int width    = dis->rcItem.right - dis->rcItem.left;
-        const int origin_x = dis->rcItem.left;
+        const int width    = banner_rect.right - banner_rect.left;
+        const int height   = banner_rect.top - banner_rect.bottom;
+        const int origin_x = banner_rect.left;
+        const int origin_y = banner_rect.top;
 
-        for ( int y = dis->rcItem.top; y < dis->rcItem.bottom; y += step )
+        // TODO: skew
+        for ( int y = banner_rect.top; y < banner_rect.bottom; y += step )
         {
-            const int yy = 255 * ( y - dis->rcItem.top ) / ( dis->rcItem.top - dis->rcItem.bottom );
+            const int yy = denominator * ( y - origin_y ) / height;
 
-            for ( int x = dis->rcItem.left; x < dis->rcItem.right; x += step )
+            for ( int x = banner_rect.left; x < banner_rect.right; x += step )
             {
-                const int yy0
-                    = 255 * rtl::abs( 5 - ( 10 * ( offset + x - origin_x ) / width ) % 10 ) / 5;
+                const int yy0 = denominator
+                    * rtl::abs( half_period
+                                - ( period * ( banner_phase + x - origin_x ) / width ) % period )
+                    / half_period;
 
-                const int val = ( 255 - rtl::abs( 255 + yy - yy0 ) ) & 0xff;
+                const int val = rtl::clamp( denominator - rtl::abs( denominator + yy - yy0 ), 0,
+                                            max_color_value );
 
-                HBRUSH brush = ::CreateSolidBrush(
-                    RGB( val, val / 2, 255 - val / 4 ) ); // TODO: check result
+                HBRUSH brush = ::CreateSolidBrush( RGB( val, val / 2, max_color_value - val / 4 ) );
+                RTL_WINAPI_CHECK( brush != nullptr );
+
+                [[maybe_unused]] BOOL result;
 
                 RECT rect;
-                ::SetRect( &rect, x, y, x + size, y + size ); // TODO: check result
-                ::FillRect( dis->hDC, &rect, brush ); // TODO: check result
+                result = ::SetRect( &rect, x, y, x + size, y + size );
+                RTL_WINAPI_CHECK( result );
+                result = ::FillRect( banner_dc, &rect, brush );
+                RTL_WINAPI_CHECK( result );
 
-                ::DeleteObject( brush ); // TODO: check result
+                result = ::DeleteObject( brush );
+                RTL_WINAPI_CHECK( result );
             }
         }
+
+        banner_phase += ( width / step ) / speed_factor;
     }
 
     void update_target_settings( HWND hwnd )
@@ -266,17 +329,6 @@ public:
 
         switch ( uMsg )
         {
-        case WM_DRAWITEM:
-        {
-            if ( wParam == CLAPP_ID_CONTROL_BANNER )
-            {
-                DRAWITEMSTRUCT* dis = reinterpret_cast<DRAWITEMSTRUCT*>( lParam );
-                owner->draw_banner( dis );
-            }
-
-            break;
-        }
-
         case WM_COMMAND:
         {
             const auto wm_id    = LOWORD( wParam );
@@ -297,12 +349,14 @@ public:
                 case IDOK:
                 {
                     owner->update_target_settings( hwnd );
-                    ::EndDialog( hwnd, 1 ); // TODO: check result
+                    [[maybe_unused]] BOOL result = ::EndDialog( hwnd, 1 );
+                    RTL_WINAPI_CHECK( result );
                     break;
                 }
 
                 case IDCANCEL:
-                    ::EndDialog( hwnd, 0 ); // TODO: check result
+                    [[maybe_unused]] BOOL result = ::EndDialog( hwnd, 0 );
+                    RTL_WINAPI_CHECK( result );
                     break;
                 }
 
@@ -312,9 +366,9 @@ public:
             break;
         }
 
-        case WM_TIMER:
+        case WM_DESTROY:
         {
-            owner->update_banner( hwnd );
+            owner->free();
             break;
         }
 
@@ -378,8 +432,7 @@ bool Settings::setup( void* parent_window, unsigned display_framerate )
     INT_PTR dlg_result = ::DialogBoxParamW( nullptr, MAKEINTRESOURCEW( CLAPP_ID_DIALOG_SETTINGS ),
                                             static_cast<HWND>( parent_window ), Impl::DialogProc,
                                             reinterpret_cast<LPARAM>( m_impl.get() ) );
-
-    // TODO: check dlg_result >= 0
+    RTL_WINAPI_CHECK( dlg_result >= 0 );
     return dlg_result > 0;
 }
 
@@ -389,9 +442,11 @@ void Settings::load( const wchar_t* filename )
     if ( !f )
         return;
 
+    [[maybe_unused]] unsigned read_bytes;
     {
         format::riff header { 0 };
-        f.read( &header, sizeof( header ) );
+        read_bytes = f.read( &header, sizeof( header ) );
+        RTL_ASSERT( read_bytes == sizeof( header ) );
 
         if ( header.id != format::signatures::clap )
             return;
@@ -400,7 +455,8 @@ void Settings::load( const wchar_t* filename )
             return;
 
         format::version version { 0 };
-        f.read( &version, sizeof( version ) );
+        read_bytes = f.read( &version, sizeof( version ) );
+        RTL_ASSERT( read_bytes == sizeof( version ) );
 
         if ( version.version != format::versions::v1 )
             return;
@@ -408,19 +464,22 @@ void Settings::load( const wchar_t* filename )
 
     {
         format::riff header { 0 };
-        f.read( &header, sizeof( header ) );
+        read_bytes = f.read( &header, sizeof( header ) );
+        RTL_ASSERT( read_bytes == sizeof( header ) );
 
         if ( header.id != format::signatures::ocld )
             return;
 
         m_impl->target_device_name = rtl::string( header.size, 0 );
-        f.read( m_impl->target_device_name.data(), m_impl->target_device_name.size() );
+        read_bytes = f.read( m_impl->target_device_name.data(), m_impl->target_device_name.size() );
+        RTL_ASSERT( read_bytes == m_impl->target_device_name.size() );
     }
 
     {
         format::riff header { 0 };
 
-        f.read( &header, sizeof( header ) );
+        read_bytes = f.read( &header, sizeof( header ) );
+        RTL_ASSERT( read_bytes == sizeof( header ) );
 
         if ( header.id != format::signatures::adio )
             return;
@@ -429,7 +488,9 @@ void Settings::load( const wchar_t* filename )
             return;
 
         format::audio audio { 0 };
-        f.read( &audio, sizeof( audio ) );
+        read_bytes = f.read( &audio, sizeof( audio ) );
+        RTL_ASSERT( read_bytes == sizeof( audio ) );
+
         m_impl->target_audio_sample_rate  = audio.sample_rate;
         m_impl->target_audio_buffer_count = audio.buffer_count;
     }
@@ -489,7 +550,6 @@ unsigned Settings::target_audio_max_latency() const
         * m_impl->target_audio_buffer_count;
 }
 
-// TODO: display audio buffer length
 // TODO: display OpenCL device status and info - extension
 // TODO: update fps after moving to another monitor
-// TODO: if no opencl - show warnigns and exit
+// TODO: if no opencl - display error and disable OK button
