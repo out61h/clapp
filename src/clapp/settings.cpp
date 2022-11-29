@@ -13,6 +13,7 @@
 #include <clapp.h>
 
 #include <rtl/array.hpp>
+#include <rtl/fix.hpp>
 #include <rtl/fourcc.hpp>
 #include <rtl/string.hpp>
 #include <rtl/sys/debug.hpp>
@@ -249,33 +250,30 @@ public:
 
     void draw_banner( HDC banner_dc, const RECT& banner_rect )
     {
+        using fp8 = rtl::fix<int, 8>;
+
         constexpr int step            = 20;
         constexpr int size            = 18;
-        constexpr int period          = 10;
-        constexpr int half_period     = period / 2;
-        constexpr int denominator     = 256;
+        constexpr int period          = 1;
         constexpr int max_color_value = 255;
         constexpr int speed_factor    = 3;
 
         const int width    = banner_rect.right - banner_rect.left;
-        const int height   = banner_rect.top - banner_rect.bottom;
+        const int height   = banner_rect.bottom - banner_rect.top;
         const int origin_x = banner_rect.left;
         const int origin_y = banner_rect.top;
 
-        // TODO: skew
         for ( int y = banner_rect.top; y < banner_rect.bottom; y += step )
         {
-            const int yy = denominator * ( y - origin_y ) / height;
+            const fp8 yy = fp8( y - origin_y ) / height;
 
             for ( int x = banner_rect.left; x < banner_rect.right; x += step )
             {
-                const int yy0 = denominator
-                    * rtl::abs( half_period
-                                - ( period * ( banner_phase + x - origin_x ) / width ) % period )
-                    / half_period;
+                const fp8 xx  = fp8( banner_phase + x - origin_x ) / width;
+                const fp8 yy0 = rtl::abs( fp8( 1 ) - ( xx * ( 2 * period + 1 ) ) % 2 );
 
-                const int val = rtl::clamp( denominator - rtl::abs( denominator + yy - yy0 ), 0,
-                                            max_color_value );
+                const fp8 col = rtl::clamp( fp8( 1 ) - rtl::abs( yy - yy0 ), fp8( 0 ), fp8( 1 ) );
+                const int val = static_cast<int>( col * max_color_value );
 
                 HBRUSH brush = ::CreateSolidBrush( RGB( val, val / 2, max_color_value - val / 4 ) );
                 RTL_WINAPI_CHECK( brush != nullptr );
