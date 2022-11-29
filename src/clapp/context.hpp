@@ -32,14 +32,17 @@ namespace clapp
         bool load_state( const wchar_t* filename );
         void reset_state();
 
+        const rtl::string& opencl_device_name() const { return device_name; }
+
     private:
         static constexpr size_t keys_count = 256;
 
         // TODO: Use common (with OpenCL program) constants definitions
         static constexpr size_t state_buffer_size
-            = ( 2560 / 4 ) * ( 1440 / 4 ) + 256 * 256 + 256 * 256;
+            = ( 7680 / 4 ) * ( 4320 / 4 ) + 256 * 256 + 256 * 256;
 
         // TODO: add m_ prefix
+        rtl::string          device_name;
         rtl::opencl::context context;
         rtl::opencl::program program;
 

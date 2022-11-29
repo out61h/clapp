@@ -19,6 +19,7 @@ using namespace clapp;
 namespace fs = rtl::filesystem;
 
 Context::Context( const rtl::opencl::device& device )
+    : device_name( device.name() )
 {
     // cppcheck-suppress useInitializationList
     context = rtl::opencl::context::create_with_current_ogl_context( device );

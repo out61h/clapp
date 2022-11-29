@@ -30,7 +30,7 @@ void Renderer::init( int width, int height )
     ::glViewport( 0, 0, width, height );
     ::glDisable( GL_LIGHTING );
     ::glEnable( GL_TEXTURE_2D );
-    ::glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
+    ::glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
     cleanup();
 
@@ -39,6 +39,8 @@ void Renderer::init( int width, int height )
     ::glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                     nullptr );
 }
+
+void Renderer::clear() { ::glClear( GL_COLOR_BUFFER_BIT ); }
 
 void Renderer::draw()
 {

@@ -20,6 +20,7 @@ namespace clapp
 
         void init( int width, int height );
         void draw();
+        void clear();
 
         unsigned texture() const { return m_texture; }
 

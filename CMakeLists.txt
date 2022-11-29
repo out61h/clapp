@@ -76,6 +76,7 @@ if( MSVC )
             RTL_ENABLE_APP_OSD=0
             RTL_ENABLE_APP_OPENGL=1
             RTL_ENABLE_APP_OPENGL_VSYNC=1
+            RTL_ENABLE_APP_RESET=1
             RTL_ENABLE_APP_RESIZE=1
             RTL_ENABLE_APP_RESOURCES=1
             RTL_ENABLE_APP_SCREEN_BUFFER=0
@@ -121,7 +122,7 @@ if( MSVC )
     )
 
     target_link_options(${PROJECT_NAME}
-        PRIVATE       
+        PRIVATE
             /DYNAMICBASE:NO                                 # Specifies whether to generate an executable image that's rebased at load time by using the address space layout randomization (ASLR) feature.
             /FIXED                                          # Creates a program that can be loaded only at its preferred base address.
             /INCREMENTAL:NO                                 # Controls incremental linking.
