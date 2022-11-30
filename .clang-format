@@ -1,16 +1,24 @@
 BasedOnStyle : WebKit
 
 AlignAfterOpenBracket :	Align
-AllowAllArgumentsOnNextLine : true
-AlignConsecutiveAssignments : true
-AlignConsecutiveDeclarations : true
+AlignConsecutiveAssignments : Consecutive
+# AlignConsecutiveDeclarations : true
+AlignConsecutiveDeclarations : Consecutive
+AlignOperands : AlignAfterOperator
+AllowAllArgumentsOnNextLine : false
+AllowAllParametersOfDeclarationOnNextLine : false
+AllowShortBlocksOnASingleLine : Empty
+AllowShortFunctionsOnASingleLine : Inline
 # AlignConsecutiveMacros : true
 AlwaysBreakTemplateDeclarations : true
-BinPackArguments : true
-BinPackParameters : true
+BinPackArguments : false
+BinPackParameters : false
 BreakBeforeBinaryOperators : All
 BreakBeforeBraces : Allman
+BreakBeforeTernaryOperators : true
 ColumnLimit : 100
+Cpp11BracedListStyle : true
 # IndentPPDirectives: BeforeHash 
 NamespaceIndentation : All
 SpacesInParentheses : true
+UseTab : Never

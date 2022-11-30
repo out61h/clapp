@@ -103,7 +103,8 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
         .arg( buffer_video );
 
     context.enqueue_acquire_ogl_object( buffer_video );
-    context.enqueue_process_2d( kernel_video_out, (size_t)input.screen.width,
+    context.enqueue_process_2d( kernel_video_out,
+                                (size_t)input.screen.width,
                                 (size_t)input.screen.height );
     context.enqueue_release_ogl_object( buffer_video );
 
@@ -116,9 +117,11 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
         .arg( input.audio.samples_per_second );
 
     context.enqueue_process_1d( kernel_audio_out, input.audio.samples_per_frame );
-    context.enqueue_copy( buffer_audio_left, audio_data_left.data(),
+    context.enqueue_copy( buffer_audio_left,
+                          audio_data_left.data(),
                           input.audio.samples_per_frame );
-    context.enqueue_copy( buffer_audio_right, audio_data_right.data(),
+    context.enqueue_copy( buffer_audio_right,
+                          audio_data_right.data(),
                           input.audio.samples_per_frame );
 
     buffer_state_output_index = 1u - buffer_state_output_index;

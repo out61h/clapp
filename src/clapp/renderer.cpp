@@ -20,7 +20,10 @@
 
 using namespace clapp;
 
-Renderer::~Renderer() { cleanup(); }
+Renderer::~Renderer()
+{
+    cleanup();
+}
 
 void Renderer::init( int width, int height )
 {
@@ -36,15 +39,24 @@ void Renderer::init( int width, int height )
 
     ::glGenTextures( 1, &m_texture );
     ::glBindTexture( GL_TEXTURE_2D, m_texture );
-    ::glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+    ::glTexImage2D( GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA,
+                    width,
+                    height,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
                     nullptr );
 }
 
-void Renderer::clear() { ::glClear( GL_COLOR_BUFFER_BIT ); }
+void Renderer::clear()
+{
+    ::glClear( GL_COLOR_BUFFER_BIT );
+}
 
 void Renderer::draw()
 {
-    // TODO: extract to renderer component
     // TODO: Use OpenGL 3.x API with shaders
     ::glClear( GL_COLOR_BUFFER_BIT );
 
