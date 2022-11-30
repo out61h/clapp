@@ -21,7 +21,7 @@ CLAPP_ID_OPENCL_PROGRAM FILE        "cl/program.i"
 
 #endif
 
-CLAPP_ID_DIALOG_SETTINGS DIALOGEX 0, 0, 240, 190
+CLAPP_ID_DIALOG_SETTINGS DIALOGEX 0, 0, 240, 210
 CAPTION "CLapp settings"
 STYLE DS_CENTER | DS_MODALFRAME | WS_CAPTION | WS_POPUP
 FONT 8, "MS Sans Serif" 
@@ -33,20 +33,23 @@ BEGIN
                     124, 68, 108, 120, 
                     CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
 
-    LTEXT           "Audio sample rate:", IDC_STATIC, 8, 87, 108, 15
-    COMBOBOX        CLAPP_ID_CONTROL_AUDIO_RATE, 124, 87, 108, 120, 
+    LTEXT           "OpenCL device version:", IDC_STATIC, 8, 87, 108, 15
+    LTEXT           "", CLAPP_ID_CONTROL_OPENCL_INFO, 124, 87, 108, 15
+
+    LTEXT           "Audio sample rate:", IDC_STATIC, 8, 106, 108, 15    
+    COMBOBOX        CLAPP_ID_CONTROL_AUDIO_RATE, 124, 106, 108, 120, 
                     CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
 
-    LTEXT           "Audio buffers count:", IDC_STATIC, 8, 106, 108, 15
-    COMBOBOX        CLAPP_ID_CONTROL_AUDIO_BUFFERS, 124, 106, 108, 120, 
+    LTEXT           "Audio buffers count:", IDC_STATIC, 8, 125, 108, 15
+    COMBOBOX        CLAPP_ID_CONTROL_AUDIO_BUFFERS, 124, 125, 108, 120, 
                     CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL    
 
-    LTEXT           "Max audio latency:", IDC_STATIC, 8, 125, 108, 15
-    RTEXT           "", CLAPP_ID_CONTROL_AUDIO_LATENCY, 124, 125, 108, 15
+    LTEXT           "Max audio latency:", IDC_STATIC, 8, 144, 108, 15
+    RTEXT           "", CLAPP_ID_CONTROL_AUDIO_LATENCY, 124, 144, 108, 15
 
-    LTEXT           "Video framerate:", IDC_STATIC, 8, 144, 108, 15
-    RTEXT           "", CLAPP_ID_CONTROL_FRAMERATE, 124, 144, 108, 15
+    LTEXT           "Video framerate:", IDC_STATIC, 8, 163, 108, 15
+    RTEXT           "", CLAPP_ID_CONTROL_FRAMERATE, 124, 163, 108, 15
 
-	DEFPUSHBUTTON   "Continue", IDOK, 8, 167, 108, 15
-    PUSHBUTTON      "Close", IDCANCEL, 124, 167, 108, 15
+	DEFPUSHBUTTON   "Continue", IDOK, 8, 186, 108, 15
+    PUSHBUTTON      "Close", IDCANCEL, 124, 186, 108, 15
 END

@@ -19,6 +19,7 @@
 #include <rtl/sys/debug.hpp>
 #include <rtl/sys/filesystem.hpp>
 #include <rtl/sys/opencl.hpp>
+#include <rtl/sys/printf.hpp>
 
 // HACK: Shortcut to get RTL_WINAPI_CHECK macro definition. I plan to move all Windows-specific code
 // to RTL library, so such solution is acceptable for a while.
@@ -35,6 +36,11 @@ using namespace clapp;
 
 namespace fs = rtl::filesystem;
 using fs::file;
+
+namespace
+{
+    constexpr rtl::string_view target_opencl_extension { "cl_khr_gl_sharing" };
+}
 
 #pragma pack( push, 1 )
 namespace format
@@ -70,45 +76,84 @@ namespace format
 }
 #pragma pack( pop )
 
-static void center_window( HWND dialog_window )
+namespace
 {
-    [[maybe_unused]] BOOL result;
-
-    HWND parent_window;
-    RECT dialog_rect, parent_rect;
-
-    if ( ( parent_window = ::GetParent( dialog_window ) ) != nullptr )
+    void center_window( HWND dialog_window )
     {
-        result = ::GetWindowRect( dialog_window, &dialog_rect );
-        RTL_WINAPI_CHECK( result );
+        [[maybe_unused]] BOOL result;
 
-        result = ::GetWindowRect( parent_window, &parent_rect );
-        RTL_WINAPI_CHECK( result );
+        HWND parent_window;
+        RECT dialog_rect, parent_rect;
 
-        const int width  = dialog_rect.right - dialog_rect.left;
-        const int height = dialog_rect.bottom - dialog_rect.top;
+        if ( ( parent_window = ::GetParent( dialog_window ) ) != nullptr )
+        {
+            result = ::GetWindowRect( dialog_window, &dialog_rect );
+            RTL_WINAPI_CHECK( result );
 
-        int cx = ( ( parent_rect.right - parent_rect.left ) - width ) / 2 + parent_rect.left;
-        int cy = ( ( parent_rect.bottom - parent_rect.top ) - height ) / 2 + parent_rect.top;
+            result = ::GetWindowRect( parent_window, &parent_rect );
+            RTL_WINAPI_CHECK( result );
 
-        const int screen_width  = ::GetSystemMetrics( SM_CXSCREEN );
-        const int screen_height = ::GetSystemMetrics( SM_CYSCREEN );
+            const int width  = dialog_rect.right - dialog_rect.left;
+            const int height = dialog_rect.bottom - dialog_rect.top;
 
-        // Make sure that the dialog box never moves outside of the screen
-        if ( cx < 0 )
-            cx = 0;
+            int cx = ( ( parent_rect.right - parent_rect.left ) - width ) / 2 + parent_rect.left;
+            int cy = ( ( parent_rect.bottom - parent_rect.top ) - height ) / 2 + parent_rect.top;
 
-        if ( cy < 0 )
-            cy = 0;
+            const int screen_width  = ::GetSystemMetrics( SM_CXSCREEN );
+            const int screen_height = ::GetSystemMetrics( SM_CYSCREEN );
 
-        if ( cx + width > screen_width )
-            cx = screen_width - width;
+            // Make sure that the dialog box never moves outside of the screen
+            if ( cx < 0 )
+                cx = 0;
 
-        if ( cy + height > screen_height )
-            cy = screen_height - height;
+            if ( cy < 0 )
+                cy = 0;
 
-        result = ::MoveWindow( dialog_window, cx, cy, width, height, FALSE );
-        RTL_WINAPI_CHECK( result );
+            if ( cx + width > screen_width )
+                cx = screen_width - width;
+
+            if ( cy + height > screen_height )
+                cy = screen_height - height;
+
+            result = ::MoveWindow( dialog_window, cx, cy, width, height, FALSE );
+            RTL_WINAPI_CHECK( result );
+        }
+    }
+
+    template <typename T>
+    T get_combobox_selected_item_data( HWND hwnd, int control_id )
+    {
+        LRESULT index = ::SendDlgItemMessageW( hwnd, control_id, CB_GETCURSEL, 0, 0 );
+        RTL_ASSERT( index != CB_ERR );
+
+        LRESULT data = ::SendDlgItemMessageW( hwnd,
+                                              control_id,
+                                              CB_GETITEMDATA,
+                                              static_cast<WPARAM>( index ),
+                                              0 );
+        RTL_ASSERT( data != CB_ERR );
+
+        return static_cast<T>( data );
+    }
+
+    template <typename T>
+    unsigned add_combobox_item( HWND hwnd, int control_id, const wchar_t* string, T data )
+    {
+        LRESULT index = ::SendDlgItemMessageW( hwnd,
+                                               control_id,
+                                               CB_ADDSTRING,
+                                               0,
+                                               reinterpret_cast<LPARAM>( string ) );
+        RTL_ASSERT( index >= 0 );
+
+        [[maybe_unused]] LRESULT lresult = ::SendDlgItemMessageW( hwnd,
+                                                                  control_id,
+                                                                  CB_SETITEMDATA,
+                                                                  static_cast<WPARAM>( index ),
+                                                                  static_cast<LPARAM>( data ) );
+        RTL_ASSERT( lresult != CB_ERR );
+
+        return static_cast<unsigned>( index );
     }
 }
 
@@ -130,8 +175,8 @@ public:
     {
         size_t selection_index = 0;
 
-        constexpr rtl::array<unsigned, 7> audio_rates { 8000,  11025, 16000, 22050,
-                                                        32000, 44100, 48000 };
+        constexpr rtl::array<unsigned, 7>
+            audio_rates { 8000, 11025, 16000, 22050, 32000, 44100, 48000 };
 
         for ( size_t i = 0; i < audio_rates.size(); ++i )
         {
@@ -140,13 +185,16 @@ public:
             if ( rate <= target_audio_sample_rate )
                 selection_index = i;
 
+            // TODO: Use safe template-based rtl::wsprintf( "%u Hz", ... );
+            // TODO: Take format string from resources
             const rtl::wstring text = rtl::to_wstring( rate ) + L" Hz";
 
-            ::SendDlgItemMessageW( hwnd, control_id, CB_ADDSTRING, 0, (LPARAM)text.c_str() );
-            ::SendDlgItemMessageW( hwnd, control_id, CB_SETITEMDATA, i, (LPARAM)rate );
+            add_combobox_item( hwnd, control_id, text.c_str(), rate );
         }
 
-        ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+        [[maybe_unused]] LRESULT lresult
+            = ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+        RTL_ASSERT( lresult != CB_ERR );
     }
 
     void init_audio_buffer_size( HWND hwnd, int control_id )
@@ -164,16 +212,20 @@ public:
 
             const rtl::wstring text = rtl::to_wstring( count );
 
-            ::SendDlgItemMessageW( hwnd, control_id, CB_ADDSTRING, 0, (LPARAM)text.c_str() );
-            ::SendDlgItemMessageW( hwnd, control_id, CB_SETITEMDATA, i, (LPARAM)count );
+            add_combobox_item( hwnd, control_id, text.c_str(), count );
         }
 
-        ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+        [[maybe_unused]] LRESULT lresult
+            = ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+        RTL_ASSERT( lresult != CB_ERR );
     }
 
     void init_opencl_device( HWND hwnd, int control_id )
     {
-        // auto platforms = cl::platform::query_list_by_extension( "cl_khr_gl_sharing" );
+        [[maybe_unused]] LRESULT lresult;
+
+        ::SendDlgItemMessageW( hwnd, control_id, CB_RESETCONTENT, 0, 0 );
+
         auto platforms     = rtl::opencl::platform::query_list();
         target_device_list = rtl::opencl::device::query_list( platforms );
 
@@ -183,27 +235,61 @@ public:
         {
             auto& device = target_device_list[i];
 
-            if ( device.name() == target_device_name )
-                selection_index = i;
+            if ( device.extension_supported( target_opencl_extension ) )
+            {
+                const rtl::wstring text = rtl::to_wstring( device.name() );
 
-            ::SendDlgItemMessageA( hwnd, control_id, CB_ADDSTRING, 0,
-                                   (LPARAM)device.name().c_str() );
+                const unsigned item_index = add_combobox_item( hwnd, control_id, text.c_str(), i );
+
+                if ( device.name() == target_device_name )
+                {
+                    target_device_index = i;
+                    selection_index     = item_index;
+                }
+            }
         }
 
-        target_device_index = selection_index;
-        target_device_name  = target_device_list[selection_index].name();
-        ::SendDlgItemMessageA( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+        if ( target_device_list.empty() )
+        {
+            // TODO: Take string from resources
+            lresult
+                = ::SendDlgItemMessageW( hwnd, control_id, CB_ADDSTRING, 0, (LPARAM)L"Not found" );
+            RTL_ASSERT( lresult >= 0 );
+
+            HWND control_hwnd = ::GetDlgItem( hwnd, control_id );
+            RTL_WINAPI_CHECK( control_hwnd != nullptr );
+
+            ::EnableWindow( control_hwnd, FALSE );
+
+            lresult = ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, 0, 0 );
+            RTL_ASSERT( lresult != CB_ERR );
+        }
+        else
+        {
+            target_device_name = target_device_list[target_device_index].name();
+
+            lresult = ::SendDlgItemMessageW( hwnd, control_id, CB_SETCURSEL, selection_index, 0 );
+            RTL_ASSERT( lresult != CB_ERR );
+        }
     }
 
     void init( HWND hwnd )
     {
         // NOTE: The dialog will not appear on top of the fullscreen window without this code!
-        [[maybe_unused]] BOOL result = ::SetWindowPos( hwnd, HWND_TOP, 0, 0, 0, 0,
+        [[maybe_unused]] BOOL result = ::SetWindowPos( hwnd,
+                                                       HWND_TOP,
+                                                       0,
+                                                       0,
+                                                       0,
+                                                       0,
                                                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
         RTL_WINAPI_CHECK( result );
 
         ::SetForegroundWindow( hwnd );
-        ::SetFocus( hwnd );
+
+        HWND control_hwnd = ::GetDlgItem( hwnd, IDOK );
+        RTL_WINAPI_CHECK( control_hwnd != nullptr );
+        ::SetFocus( control_hwnd );
 
         dialog_window = hwnd;
 
@@ -211,6 +297,7 @@ public:
         init_audio_buffer_size( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS );
         init_opencl_device( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
         update_max_latency( hwnd );
+        update_opencl_device( hwnd );
 
         center_window( hwnd );
     }
@@ -224,45 +311,67 @@ public:
         dialog_window = nullptr;
     }
 
+    void update_opencl_device( HWND hwnd )
+    {
+        if ( target_device_list.empty() )
+            return;
+
+        const unsigned device_index
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
+
+        const auto& device = target_device_list[device_index];
+
+        [[maybe_unused]] BOOL result
+            = ::SetDlgItemTextW( hwnd,
+                                 CLAPP_ID_CONTROL_OPENCL_INFO,
+                                 rtl::to_wstring( device.version() ).c_str() );
+        RTL_WINAPI_CHECK( result );
+    }
+
     void update_max_latency( HWND hwnd )
     {
-        const LONG_PTR rate_index
-            = ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE, CB_GETCURSEL, 0, 0 );
-        const LONG_PTR rate_value = ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE,
-                                                           CB_GETITEMDATA, (WPARAM)rate_index, 0 );
-
-        const LONG_PTR buffers_index
-            = ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS, CB_GETCURSEL, 0, 0 );
-        const LONG_PTR buffers_value = ::SendDlgItemMessageW(
-            hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS, CB_GETITEMDATA, (WPARAM)buffers_index, 0 );
+        const unsigned audio_rate
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE );
+        const unsigned buffers_count
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS );
 
         const int audio_latency_ms
-            = static_cast<int>( 1000 / target_monitor_frame_rate * buffers_value );
+            = static_cast<int>( 1000 / target_monitor_frame_rate * buffers_count );
         const int audio_latency_samples
-            = static_cast<int>( rate_value / target_monitor_frame_rate * buffers_value );
+            = static_cast<int>( audio_rate / target_monitor_frame_rate * buffers_count );
+
         {
+            // TODO: Use safe template-based rtl::wsprintf( "%i ms / %i samples", ... );
+            // TODO: Take format string from resources
             const rtl::wstring text = rtl::to_wstring( audio_latency_ms ) + L" ms / "
-                + rtl::to_wstring( audio_latency_samples ) + L" samples";
+                                    + rtl::to_wstring( audio_latency_samples ) + L" samples";
 
-            ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_AUDIO_LATENCY, text.c_str() );
+            [[maybe_unused]] BOOL result
+                = ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_AUDIO_LATENCY, text.c_str() );
+            RTL_WINAPI_CHECK( result );
         }
 
         {
+            // TODO: Use safe template-based rtl::wsprintf( "%u fps", ... );
+            // TODO: Take format string from resources
             const rtl::wstring text = rtl::to_wstring( target_monitor_frame_rate ) + L" fps";
-            ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_FRAMERATE, text.c_str() );
-        }
 
-        [[maybe_unused]] MMRESULT result;
+            [[maybe_unused]] BOOL result
+                = ::SetDlgItemTextW( hwnd, CLAPP_ID_CONTROL_FRAMERATE, text.c_str() );
+            RTL_WINAPI_CHECK( result );
+        }
 
         if ( dialog_timer )
         {
-            result = ::timeKillEvent( dialog_timer );
+            [[maybe_unused]] MMRESULT result = ::timeKillEvent( dialog_timer );
             RTL_ASSERT( result == TIMERR_NOERROR );
         }
 
         dialog_timer
-            = ::timeSetEvent( static_cast<UINT>( 1000 / target_monitor_frame_rate ), 0,
-                              &Impl::on_timer, reinterpret_cast<DWORD_PTR>( this ),
+            = ::timeSetEvent( static_cast<UINT>( 1000 / target_monitor_frame_rate ),
+                              0,
+                              &Impl::on_timer,
+                              reinterpret_cast<DWORD_PTR>( this ),
                               TIME_PERIODIC | TIME_CALLBACK_FUNCTION | TIME_KILL_SYNCHRONOUS );
         RTL_ASSERT( dialog_timer != 0 );
     }
@@ -338,33 +447,36 @@ public:
         banner_phase += ( width / step ) / speed_factor;
     }
 
-    void update_target_settings( HWND hwnd )
+    bool update_target_settings( HWND hwnd )
     {
+        if ( target_device_list.empty() )
         {
-            target_device_index = static_cast<unsigned>(
-                ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE, CB_GETCURSEL, 0, 0 ) );
-            target_device_name = target_device_list[target_device_index].name();
+            // TODO: Take strings from resources
+            [[maybe_unused]] int result = ::MessageBoxW( hwnd,
+                                                         L"No OpenCL devices found in your system.",
+                                                         L"Can't do anything useful",
+                                                         MB_ICONWARNING | MB_OK );
+            RTL_WINAPI_CHECK( result == IDOK );
+
+            init_opencl_device( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
+            return false;
         }
 
-        {
-            const unsigned audio_rate_index = static_cast<unsigned>(
-                ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE, CB_GETCURSEL, 0, 0 ) );
+        target_device_index
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_OPENCL_DEVICE );
+        target_audio_sample_rate
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_AUDIO_RATE );
+        target_audio_buffer_count
+            = get_combobox_selected_item_data<unsigned>( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS );
 
-            target_audio_sample_rate = static_cast<unsigned>( ::SendDlgItemMessageW(
-                hwnd, CLAPP_ID_CONTROL_AUDIO_RATE, CB_GETITEMDATA, audio_rate_index, 0 ) );
-        }
+        target_device_name = target_device_list[target_device_index].name();
 
-        {
-            const unsigned audio_buffers_count_index = static_cast<unsigned>(
-                ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS, CB_GETCURSEL, 0, 0 ) );
-
-            target_audio_buffer_count = static_cast<unsigned>(
-                ::SendDlgItemMessageW( hwnd, CLAPP_ID_CONTROL_AUDIO_BUFFERS, CB_GETITEMDATA,
-                                       audio_buffers_count_index, 0 ) );
-        }
+        return true;
     }
 
-    static INT_PTR CALLBACK DialogProc( HWND hwnd, UINT uMsg, [[maybe_unused]] WPARAM wParam,
+    static INT_PTR CALLBACK DialogProc( HWND                    hwnd,
+                                        UINT                    uMsg,
+                                        [[maybe_unused]] WPARAM wParam,
                                         [[maybe_unused]] LPARAM lParam )
     {
         Impl* owner = reinterpret_cast<Impl*>( ::GetWindowLongPtrW( hwnd, GWLP_USERDATA ) );
@@ -383,6 +495,10 @@ public:
                 {
                     owner->update_max_latency( hwnd );
                 }
+                else if ( wm_id == CLAPP_ID_CONTROL_OPENCL_DEVICE )
+                {
+                    owner->update_opencl_device( hwnd );
+                }
             }
             else
             {
@@ -390,9 +506,12 @@ public:
                 {
                 case IDOK:
                 {
-                    owner->update_target_settings( hwnd );
-                    [[maybe_unused]] BOOL result = ::EndDialog( hwnd, 1 );
-                    RTL_WINAPI_CHECK( result );
+                    if ( owner->update_target_settings( hwnd ) )
+                    {
+                        [[maybe_unused]] BOOL result = ::EndDialog( hwnd, 1 );
+                        RTL_WINAPI_CHECK( result );
+                    }
+
                     break;
                 }
 
@@ -441,8 +560,10 @@ bool Settings::setup( void* parent_window, unsigned display_framerate )
 {
     m_impl->target_monitor_frame_rate = display_framerate;
 
-    INT_PTR dlg_result = ::DialogBoxParamW( nullptr, MAKEINTRESOURCEW( CLAPP_ID_DIALOG_SETTINGS ),
-                                            static_cast<HWND>( parent_window ), Impl::DialogProc,
+    INT_PTR dlg_result = ::DialogBoxParamW( nullptr,
+                                            MAKEINTRESOURCEW( CLAPP_ID_DIALOG_SETTINGS ),
+                                            static_cast<HWND>( parent_window ),
+                                            Impl::DialogProc,
                                             reinterpret_cast<LPARAM>( m_impl.get() ) );
     RTL_WINAPI_CHECK( dlg_result >= 0 );
     return dlg_result > 0;
@@ -554,14 +675,13 @@ const rtl::opencl::device& Settings::target_opencl_device() const
     return m_impl->target_device_list[m_impl->target_device_index];
 }
 
-unsigned Settings::target_audio_sample_rate() const { return m_impl->target_audio_sample_rate; }
+unsigned Settings::target_audio_sample_rate() const
+{
+    return m_impl->target_audio_sample_rate;
+}
 
 unsigned Settings::target_audio_max_latency() const
 {
     return m_impl->target_audio_sample_rate / m_impl->target_monitor_frame_rate
-        * m_impl->target_audio_buffer_count;
+         * m_impl->target_audio_buffer_count;
 }
-
-// TODO: display OpenCL device status and info - extension
-// TODO: update fps after moving to another monitor
-// TODO: if no opencl - display error and disable OK button
