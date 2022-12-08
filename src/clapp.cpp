@@ -8,128 +8,15 @@
  * license with this file. If not, please visit:
  * https://github.com/out61h/clapp/blob/main/LICENSE.
  */
-#include <rtl/memory.hpp>
-#include <rtl/string.hpp>
-
 #include <rtl/sys/application.hpp>
 #include <rtl/sys/debug.hpp>
-#include <rtl/sys/opencl.hpp>
 
-#include <clapp/context.hpp>
-#include <clapp/font.hpp>
-#include <clapp/hud.hpp>
-#include <clapp/renderer.hpp>
-#include <clapp/settings.hpp>
-
-#include <clapp.h>
+#include <clapp/app.hpp>
 
 using rtl::application;
 using namespace rtl::keyboard;
 
-namespace cl     = rtl::opencl;
-namespace chrono = rtl::chrono;
-
-using clapp::Context;
-using clapp::Font;
-using clapp::Hud;
-using clapp::Renderer;
-using clapp::Settings;
-
-namespace filenames
-{
-    constexpr wchar_t settings[] { L"clapp.ini" };
-    constexpr wchar_t save[] { L"clapp.save" };
-    constexpr wchar_t auto_save[] { L"clapp.auto.save" };
-    constexpr wchar_t program[] { L"clapp.cl" };
-}
-
-namespace strings
-{
-    // TODO: Take from resources
-    constexpr wchar_t short_help_message[] { L"F1" };
-    constexpr wchar_t long_help_message[] {
-        L"F1 - Toggle help : F2 - Save state : F3 - Load state : F5 - Reload CL program : "
-        L"F9 - Toggle stats : F10 - Show "
-        L"settings dialog : F11 - Toggle fullscreen" };
-}
-
-namespace ui
-{
-    int font_size( int screen_width )
-    {
-        return 20 * screen_width / 1280;
-    }
-}
-
-// TODO: move to clapp/app.hpp
-class App final
-{
-public:
-    // TODO: private
-    rtl::unique_ptr<Settings> settings;
-    rtl::unique_ptr<Hud>      hud;
-    rtl::unique_ptr<Renderer> renderer;
-    rtl::unique_ptr<Font>     font;
-    rtl::unique_ptr<Context>  context;
-
-    App()
-    {
-        // TODO: rtl::make_unique
-        hud.reset( new Hud );
-        show_help( true );
-    }
-
-    void show_help( bool show )
-    {
-        m_show_help = show;
-        hud->set_status( m_show_help ? strings::long_help_message : strings::short_help_message );
-    }
-
-    void toggle_help() { show_help( !m_show_help ); }
-
-    void reset_state()
-    {
-        context->reset_state();
-        // TODO: Take from resources
-        hud->add_message( L"Reset successful." );
-    }
-
-    void load_state()
-    {
-        if ( context->load_state( filenames::save ) )
-        {
-            // TODO: Take from resources
-            hud->add_message( L"Loaded successfully." );
-        }
-    }
-
-    void save_state()
-    {
-        if ( context->save_state( filenames::save ) )
-        {
-            // TODO: Take from resources
-            hud->add_message( L"Saved successfully." );
-        }
-    }
-
-    void reload_program()
-    {
-        context->load_program( filenames::program );
-        // TODO: Take from resources
-        hud->add_message( L"Program loaded successfully." );
-    }
-
-    void shutdown()
-    {
-        context->save_state( filenames::auto_save );
-        // TODO: save/load window geometry
-        settings->save( filenames::settings );
-    }
-
-private:
-    bool m_show_help { true };
-    bool m_pad[3] { 0 };
-};
+using clapp::App;
 
 // NOTE: Global variables help to reduce the size of the compiled code
 // TODO: Implement rtl::function template to make possible to pass lambdas with capture list to RTL
@@ -150,69 +37,13 @@ int main( int, char*[] )
             if ( !g_app )
                 g_app = new App;
 
-            if ( !g_app->settings )
-            {
-                // TODO: rtl::make_unique
-                g_app->settings.reset( new Settings );
-                g_app->settings->load( filenames::settings );
-
-                if ( !g_app->settings->setup( nullptr, envir.display.framerate ) )
-                    return false;
-            }
-            else
-            {
-                if ( !g_app->settings->setup( envir.window_handle, envir.display.framerate ) )
-                    return false;
-
-                if ( g_app->context
-                     && g_app->settings->target_opencl_device().name()
-                            != g_app->context->opencl_device_name() )
-                {
-                    // reset working context, if user selected another OpenCL device
-                    g_app->context->save_state( filenames::auto_save );
-                    g_app->context.reset();
-                }
-            }
-
-            params.audio.samples_per_second  = g_app->settings->target_audio_sample_rate();
-            params.audio.max_latency_samples = g_app->settings->target_audio_max_latency();
+            if ( !g_app->setup( envir, params ) )
+                return false;
 
             return true;
         },
         []( const application::environment& envir, const application::input& input )
-        {
-            // NOTE: class \Context depends on OpenGL context, so we should initialize it
-            // in \on_init callback which is called after OpenGL context was initialized.
-            if ( !g_app->context )
-            {
-                // TODO: Compile source once and cache compiled binaries in the file.
-                // TODO: Compile program in async manner, display status (progress???)
-                // TODO: rtl::make_unique
-                g_app->context.reset( new Context( g_app->settings->target_opencl_device() ) );
-#if !CLAPP_ENABLE_ARCHITECT_MODE
-                auto program = envir.resources.open( FILE, CLAPP_ID_OPENCL_PROGRAM );
-
-                rtl::string_view source( static_cast<const char*>( program.data() ),
-                                         program.size() );
-
-                g_app->context->load_program( source );
-#else
-                g_app->context->load_program( filenames::program );
-#endif
-                g_app->context->load_state( filenames::auto_save );
-            }
-
-            // TODO: rtl::make_unique
-            if ( !g_app->renderer )
-                g_app->renderer.reset( new Renderer() );
-
-            // TODO: rtl::make_unique
-            g_app->font.reset( new Font( ui::font_size( input.screen.width ) ) );
-
-            g_app->hud->init( input.screen.width, input.screen.height );
-            g_app->renderer->init( input.screen.width, input.screen.height );
-            g_app->context->init( input, g_app->renderer->texture() );
-        },
+        { g_app->init( envir, input ); },
         []( const application::input& input, application::output& output )
         {
             if ( input.keys.pressed[keys::escape] )
@@ -245,7 +76,7 @@ int main( int, char*[] )
             {
                 // NOTE: We fill application window with background color to prevent flickering
                 // after the settings dialog appearing
-                g_app->renderer->clear();
+                g_app->clear();
 
                 return application::action::reset;
             }
@@ -255,12 +86,7 @@ int main( int, char*[] )
                 return application::action::toggle_fullscreen;
             }
 #endif
-            g_app->context->update( input, output );
-            g_app->hud->update( rtl::chrono::thirds( input.clock.third_ticks ) );
-
-            g_app->renderer->draw();
-            g_app->hud->draw( *g_app->font.get() );
-
+            g_app->update( input, output );
             return application::action::none;
         },
         []()
