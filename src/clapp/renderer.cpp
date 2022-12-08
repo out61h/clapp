@@ -10,8 +10,13 @@
  */
 #include "renderer.hpp"
 
+#include <rtl/string.hpp>
+#include <rtl/sys/debug.hpp>
+#include <rtl/vector.hpp>
+
 #pragma warning( push )
 #pragma warning( disable : 4668 )
+#define NOMINMAX
 #include <Windows.h>
 #include <gl/GL.h>
 #pragma warning( pop )
@@ -31,12 +36,11 @@ void Renderer::init( int width, int height )
     m_height = height;
 
     ::glViewport( 0, 0, width, height );
-    ::glDisable( GL_LIGHTING );
-    ::glEnable( GL_TEXTURE_2D );
     ::glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
     cleanup();
 
+    ::glEnable( GL_TEXTURE_2D );
     ::glGenTextures( 1, &m_texture );
     ::glBindTexture( GL_TEXTURE_2D, m_texture );
     ::glTexImage2D( GL_TEXTURE_2D,
@@ -48,6 +52,11 @@ void Renderer::init( int width, int height )
                     GL_RGBA,
                     GL_UNSIGNED_BYTE,
                     nullptr );
+
+    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 }
 
 void Renderer::clear()
@@ -62,19 +71,16 @@ void Renderer::draw()
 
     ::glMatrixMode( GL_PROJECTION );
     ::glLoadIdentity();
-
-    ::glBindTexture( GL_TEXTURE_2D, m_texture );
-    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    ::glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-
     ::glOrtho( 0.0, m_width, 0.0, m_height, -1.0, 1.0 );
 
     ::glMatrixMode( GL_MODELVIEW );
     ::glLoadIdentity();
+
+    ::glEnable( GL_TEXTURE_2D );
+    ::glBindTexture( GL_TEXTURE_2D, m_texture );
+
     ::glBegin( GL_QUADS );
-    ::glColor3f( 1.0f, 1.0f, 1.0f );
+    ::glColor3f( 1.f, 1.f, 1.f );
     ::glTexCoord2f( 0.f, 0.f );
     ::glVertex2i( 0, m_height );
     ::glTexCoord2f( 1.f, 0.f );
@@ -85,7 +91,7 @@ void Renderer::draw()
     ::glVertex2i( 0, 0 );
     ::glEnd();
 
-    ::glFlush();
+    ::glDisable( GL_TEXTURE_2D );
 }
 
 void Renderer::cleanup()

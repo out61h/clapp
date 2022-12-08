@@ -104,8 +104,8 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
 
     context.enqueue_acquire_ogl_object( buffer_video );
     context.enqueue_process_2d( kernel_video_out,
-                                (size_t)input.screen.width,
-                                (size_t)input.screen.height );
+                                static_cast<size_t>( input.screen.width ),
+                                static_cast<size_t>( input.screen.height ) );
     context.enqueue_release_ogl_object( buffer_video );
 
     kernel_audio_out.args()

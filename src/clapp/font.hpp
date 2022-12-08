@@ -10,30 +10,22 @@
  */
 #pragma once
 
+#include <rtl/string.hpp>
+
 namespace clapp
 {
-    class Renderer final
+    class Font final
     {
     public:
-        Renderer() = default;
-        ~Renderer();
+        explicit Font( int size );
+        ~Font();
 
-        void init( int width, int height );
+        void draw( rtl::wstring_view text, int x, int y, float opacity );
 
-        void draw();
-
-        void clear();
-
-        unsigned texture() const { return m_texture; }
+        int size() const { return m_font_size; }
 
     private:
-        Renderer( const Renderer& )            = delete;
-        Renderer& operator=( const Renderer& ) = delete;
-
-        void cleanup();
-
-        unsigned m_texture { 0 };
-        int      m_width { 0 };
-        int      m_height { 0 };
+        int      m_font_size { 0 };
+        unsigned m_font_lists { 0 };
     };
 }
