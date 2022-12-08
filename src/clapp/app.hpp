@@ -45,11 +45,11 @@ namespace clapp
         void reload_program();
 
     private:
-        rtl::unique_ptr<Settings> settings;
-        rtl::unique_ptr<Hud>      hud;
-        rtl::unique_ptr<Renderer> renderer;
-        rtl::unique_ptr<Font>     font;
-        rtl::unique_ptr<Context>  context;
+        rtl::unique_ptr<Settings> m_settings;
+        rtl::unique_ptr<Hud>      m_hud;
+        rtl::unique_ptr<Renderer> m_renderer;
+        rtl::unique_ptr<Font>     m_font;
+        rtl::unique_ptr<Context>  m_context;
 
         bool m_show_help { true };
         bool m_pad[3] { 0 };

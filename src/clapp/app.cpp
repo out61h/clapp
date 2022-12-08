@@ -48,7 +48,7 @@ namespace ui
 App::App()
 {
     // TODO: rtl::make_unique
-    hud.reset( new Hud );
+    m_hud.reset( new Hud );
     show_help( true );
 }
 
@@ -57,7 +57,7 @@ App::~App() = default;
 void App::show_help( bool show )
 {
     m_show_help = show;
-    hud->set_status( m_show_help ? strings::long_help_message : strings::short_help_message );
+    m_hud->set_status( m_show_help ? strings::long_help_message : strings::short_help_message );
 }
 
 void App::toggle_help()
@@ -67,62 +67,62 @@ void App::toggle_help()
 
 void App::reset_state()
 {
-    context->reset_state();
+    m_context->reset_state();
     // TODO: Take from resources
-    hud->add_message( L"Reset successful." );
+    m_hud->add_message( L"Reset successful." );
 }
 
 void App::load_state()
 {
-    if ( context->load_state( filenames::save ) )
+    if ( m_context->load_state( filenames::save ) )
     {
         // TODO: Take from resources
-        hud->add_message( L"Loaded successfully." );
+        m_hud->add_message( L"Loaded successfully." );
     }
 }
 
 void App::save_state()
 {
-    if ( context->save_state( filenames::save ) )
+    if ( m_context->save_state( filenames::save ) )
     {
         // TODO: Take from resources
-        hud->add_message( L"Saved successfully." );
+        m_hud->add_message( L"Saved successfully." );
     }
 }
 
 void App::reload_program()
 {
-    context->load_program( filenames::program );
+    m_context->load_program( filenames::program );
     // TODO: Take from resources
-    hud->add_message( L"Program loaded successfully." );
+    m_hud->add_message( L"Program loaded successfully." );
 }
 
 bool App::setup( const rtl::application::environment& envir, rtl::application::params& params )
 {
-    if ( !settings )
+    if ( !m_settings )
     {
         // TODO: rtl::make_unique
-        settings.reset( new Settings );
-        settings->load( filenames::settings );
+        m_settings.reset( new Settings );
+        m_settings->load( filenames::settings );
 
-        if ( !settings->setup( nullptr, envir.display.framerate ) )
+        if ( !m_settings->setup( nullptr, envir.display.framerate ) )
             return false;
     }
     else
     {
-        if ( !settings->setup( envir.window_handle, envir.display.framerate ) )
+        if ( !m_settings->setup( envir.window_handle, envir.display.framerate ) )
             return false;
 
-        if ( context && settings->target_opencl_device().name() != context->opencl_device_name() )
+        if ( m_context && m_settings->target_opencl_device().name() != m_context->opencl_device_name() )
         {
             // reset working context, if user selected another OpenCL device
-            context->save_state( filenames::auto_save );
-            context.reset();
+            m_context->save_state( filenames::auto_save );
+            m_context.reset();
         }
     }
 
-    params.audio.samples_per_second  = settings->target_audio_sample_rate();
-    params.audio.max_latency_samples = settings->target_audio_max_latency();
+    params.audio.samples_per_second  = m_settings->target_audio_sample_rate();
+    params.audio.max_latency_samples = m_settings->target_audio_max_latency();
 
     return true;
 }
@@ -131,53 +131,53 @@ void App::init( const rtl::application::environment& envir, const rtl::applicati
 {
     // NOTE: class \Context depends on OpenGL context, so we should initialize it
     // in \on_init callback which is called after OpenGL context was initialized.
-    if ( !context )
+    if ( !m_context )
     {
         // TODO: Compile source once and cache compiled binaries in the file.
         // TODO: Compile program in async manner, display status (progress???)
         // TODO: rtl::make_unique
-        context.reset( new Context( settings->target_opencl_device() ) );
+        m_context.reset( new Context( m_settings->target_opencl_device() ) );
 #if !CLAPP_ENABLE_ARCHITECT_MODE
         auto program = envir.resources.open( FILE, CLAPP_ID_OPENCL_PROGRAM );
 
         rtl::string_view source( static_cast<const char*>( program.data() ), program.size() );
 
-        context->load_program( source );
+        m_context->load_program( source );
 #else
         context->load_program( filenames::program );
 #endif
-        context->load_state( filenames::auto_save );
+        m_context->load_state( filenames::auto_save );
     }
 
     // TODO: rtl::make_unique
-    if ( !renderer )
-        renderer.reset( new Renderer() );
+    if ( !m_renderer )
+        m_renderer.reset( new Renderer() );
 
     // TODO: rtl::make_unique
-    font.reset( new Font( ui::font_size( input.screen.width ) ) );
+    m_font.reset( new Font( ui::font_size( input.screen.width ) ) );
 
-    hud->init( input.screen.width, input.screen.height );
-    renderer->init( input.screen.width, input.screen.height );
-    context->init( input, renderer->texture() );
+    m_hud->init( input.screen.width, input.screen.height );
+    m_renderer->init( input.screen.width, input.screen.height );
+    m_context->init( input, m_renderer->texture() );
 }
 
 void App::update( const rtl::application::input& input, rtl::application::output& output )
 {
-    context->update( input, output );
-    hud->update( rtl::chrono::thirds( input.clock.third_ticks ) );
+    m_context->update( input, output );
+    m_hud->update( rtl::chrono::thirds( input.clock.third_ticks ) );
 
-    renderer->draw();
-    hud->draw( *font.get() );
+    m_renderer->draw();
+    m_hud->draw( *m_font.get() );
 }
 
 void App::clear()
 {
-    renderer->clear();
+    m_renderer->clear();
 }
 
 void App::shutdown()
 {
-    context->save_state( filenames::auto_save );
+    m_context->save_state( filenames::auto_save );
     // TODO: save/load window geometry
-    settings->save( filenames::settings );
+    m_settings->save( filenames::settings );
 }
