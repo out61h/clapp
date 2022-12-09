@@ -32,7 +32,7 @@ namespace clapp
         bool load_state( const wchar_t* filename );
         void reset_state();
 
-        const rtl::string& opencl_device_name() const { return device_name; }
+        const rtl::string& opencl_device_name() const { return m_device_name; }
 
     private:
         static constexpr size_t keys_count = 256;
@@ -41,25 +41,24 @@ namespace clapp
         static constexpr size_t state_buffer_size
             = ( 7680 / 4 ) * ( 4320 / 4 ) + 256 * 256 + 256 * 256;
 
-        // TODO: add m_ prefix
-        rtl::string          device_name;
-        rtl::opencl::context context;
-        rtl::opencl::program program;
+        rtl::string          m_device_name;
+        rtl::opencl::context m_context;
+        rtl::opencl::program m_program;
 
-        rtl::opencl::kernel kernel_input;
-        rtl::opencl::kernel kernel_audio_out;
-        rtl::opencl::kernel kernel_video_out;
+        rtl::opencl::kernel m_kernel_input;
+        rtl::opencl::kernel m_kernel_audio_out;
+        rtl::opencl::kernel m_kernel_video_out;
 
-        rtl::array<rtl::opencl::buffer, 2> buffer_state;
-        size_t                             buffer_state_output_index { 0 };
+        rtl::array<rtl::opencl::buffer, 2> m_buffer_state;
+        size_t                             m_buffer_state_output_index { 0 };
 
-        rtl::opencl::buffer buffer_keys;
-        rtl::opencl::buffer buffer_audio_left;
-        rtl::opencl::buffer buffer_audio_right;
-        rtl::opencl::buffer buffer_video;
+        rtl::opencl::buffer m_buffer_keys;
+        rtl::opencl::buffer m_buffer_audio_left;
+        rtl::opencl::buffer m_buffer_audio_right;
+        rtl::opencl::buffer m_buffer_video;
 
-        rtl::vector<float> audio_data_left;
-        rtl::vector<float> audio_data_right;
-        int                audio_samples_generated { 0 };
+        rtl::vector<float> m_audio_data_left;
+        rtl::vector<float> m_audio_data_right;
+        int                m_audio_samples_generated { 0 };
     };
 }

@@ -21,7 +21,6 @@ namespace clapp
     class Font;
     class Context;
 
-    // TODO: move to clapp/app.hpp
     class App final
     {
     public:

@@ -19,17 +19,17 @@ using namespace clapp;
 namespace fs = rtl::filesystem;
 
 Context::Context( const rtl::opencl::device& device )
-    : device_name( device.name() )
+    : m_device_name( device.name() )
 {
     // cppcheck-suppress useInitializationList
-    context = rtl::opencl::context::create_with_current_ogl_context( device );
+    m_context = rtl::opencl::context::create_with_current_ogl_context( device );
 
     rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 
-    for ( auto& buffer : buffer_state )
-        buffer = context.create_buffer_1d_uint( state.size(), state.data() );
+    for ( auto& buffer : m_buffer_state )
+        buffer = m_context.create_buffer_1d_uint( state.size(), state.data() );
 
-    buffer_keys = context.create_buffer_1d_uint( keys_count );
+    m_buffer_keys = m_context.create_buffer_1d_uint( keys_count );
 }
 
 void Context::load_program( const wchar_t* filename )
@@ -49,38 +49,38 @@ void Context::load_program( const wchar_t* filename )
 
 void Context::load_program( rtl::string_view source )
 {
-    program = context.build_program( source );
+    m_program = m_context.build_program( source );
 
-    kernel_input     = program.create_kernel( "main_input" );
-    kernel_video_out = program.create_kernel( "main_video_out" );
-    kernel_audio_out = program.create_kernel( "main_audio_out" );
+    m_kernel_input     = m_program.create_kernel( "main_input" );
+    m_kernel_video_out = m_program.create_kernel( "main_video_out" );
+    m_kernel_audio_out = m_program.create_kernel( "main_audio_out" );
 }
 
 void Context::init( [[maybe_unused]] const rtl::application::input& input, unsigned gl_texture )
 {
-    audio_data_left.resize( input.audio.samples_per_frame );
-    audio_data_right.resize( input.audio.samples_per_frame );
+    m_audio_data_left.resize( input.audio.samples_per_frame );
+    m_audio_data_right.resize( input.audio.samples_per_frame );
 
-    buffer_audio_left  = context.create_buffer_1d_float( input.audio.samples_per_frame );
-    buffer_audio_right = context.create_buffer_1d_float( input.audio.samples_per_frame );
+    m_buffer_audio_left  = m_context.create_buffer_1d_float( input.audio.samples_per_frame );
+    m_buffer_audio_right = m_context.create_buffer_1d_float( input.audio.samples_per_frame );
 
-    buffer_video = context.create_buffer_2d_from_ogl_texture( gl_texture );
+    m_buffer_video = m_context.create_buffer_2d_from_ogl_texture( gl_texture );
 }
 
 void Context::update( [[maybe_unused]] const rtl::application::input& input,
                       [[maybe_unused]] rtl::application::output&      output )
 {
-    context.enqueue_copy( input.keys.state, buffer_keys, buffer_keys.length() );
+    m_context.enqueue_copy( input.keys.state, m_buffer_keys, m_buffer_keys.length() );
 
     // TODO: remove; do copying of unchanged cells inside kernels
-    context.enqueue_copy( buffer_state[1u - buffer_state_output_index],
-                          buffer_state[buffer_state_output_index] );
+    m_context.enqueue_copy( m_buffer_state[1u - m_buffer_state_output_index],
+                            m_buffer_state[m_buffer_state_output_index] );
 
-    kernel_input.args()
-        .arg( buffer_state[1u - buffer_state_output_index] ) // current state
-        .arg( buffer_state[buffer_state_output_index] ) // next state
+    m_kernel_input.args()
+        .arg( m_buffer_state[1u - m_buffer_state_output_index] ) // current state
+        .arg( m_buffer_state[m_buffer_state_output_index] ) // next state
 
-        .arg( audio_samples_generated )
+        .arg( m_audio_samples_generated )
         .arg( input.audio.samples_per_frame )
         .arg( input.audio.samples_per_second )
 
@@ -91,42 +91,43 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
         .arg( 0.5f )
         .arg( 0.5f )
 
-        .arg( buffer_keys )
-        .arg( buffer_keys.length() );
+        .arg( m_buffer_keys )
+        .arg( m_buffer_keys.length() );
 
-    context.enqueue_process_1d( kernel_input, buffer_state[buffer_state_output_index].length() );
-    context.wait();
+    m_context.enqueue_process_1d( m_kernel_input,
+                                  m_buffer_state[m_buffer_state_output_index].length() );
+    m_context.wait();
 
-    kernel_video_out.args()
-        .arg( buffer_state[buffer_state_output_index] )
-        .arg( buffer_state[buffer_state_output_index].length() )
-        .arg( buffer_video );
+    m_kernel_video_out.args()
+        .arg( m_buffer_state[m_buffer_state_output_index] )
+        .arg( m_buffer_state[m_buffer_state_output_index].length() )
+        .arg( m_buffer_video );
 
-    context.enqueue_acquire_ogl_object( buffer_video );
-    context.enqueue_process_2d( kernel_video_out,
-                                static_cast<size_t>( input.screen.width ),
-                                static_cast<size_t>( input.screen.height ) );
-    context.enqueue_release_ogl_object( buffer_video );
+    m_context.enqueue_acquire_ogl_object( m_buffer_video );
+    m_context.enqueue_process_2d( m_kernel_video_out,
+                                  static_cast<size_t>( input.screen.width ),
+                                  static_cast<size_t>( input.screen.height ) );
+    m_context.enqueue_release_ogl_object( m_buffer_video );
 
-    kernel_audio_out.args()
-        .arg( buffer_state[buffer_state_output_index] )
-        .arg( buffer_state[buffer_state_output_index].length() )
-        .arg( buffer_audio_left )
-        .arg( buffer_audio_right )
+    m_kernel_audio_out.args()
+        .arg( m_buffer_state[m_buffer_state_output_index] )
+        .arg( m_buffer_state[m_buffer_state_output_index].length() )
+        .arg( m_buffer_audio_left )
+        .arg( m_buffer_audio_right )
         .arg( input.audio.samples_per_frame )
         .arg( input.audio.samples_per_second );
 
-    context.enqueue_process_1d( kernel_audio_out, input.audio.samples_per_frame );
-    context.enqueue_copy( buffer_audio_left,
-                          audio_data_left.data(),
-                          input.audio.samples_per_frame );
-    context.enqueue_copy( buffer_audio_right,
-                          audio_data_right.data(),
-                          input.audio.samples_per_frame );
+    m_context.enqueue_process_1d( m_kernel_audio_out, input.audio.samples_per_frame );
+    m_context.enqueue_copy( m_buffer_audio_left,
+                            m_audio_data_left.data(),
+                            input.audio.samples_per_frame );
+    m_context.enqueue_copy( m_buffer_audio_right,
+                            m_audio_data_right.data(),
+                            input.audio.samples_per_frame );
 
-    buffer_state_output_index = 1u - buffer_state_output_index;
+    m_buffer_state_output_index = 1u - m_buffer_state_output_index;
 
-    context.wait();
+    m_context.wait();
 
     // TODO: convert sample format inside audio kernel
     constexpr float max_int16 = (float)rtl::numeric_limits<rtl::int16_t>::max();
@@ -136,21 +137,21 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
     for ( size_t i = 0; i < input.audio.samples_per_frame; ++i )
     {
         *samples++
-            = (rtl::int16_t)rtl::clamp( audio_data_left[i] * max_int16, -max_int16, max_int16 );
+            = (rtl::int16_t)rtl::clamp( m_audio_data_left[i] * max_int16, -max_int16, max_int16 );
         *samples++
-            = (rtl::int16_t)rtl::clamp( audio_data_right[i] * max_int16, -max_int16, max_int16 );
+            = (rtl::int16_t)rtl::clamp( m_audio_data_right[i] * max_int16, -max_int16, max_int16 );
     }
 
-    audio_samples_generated += input.audio.samples_per_frame;
+    m_audio_samples_generated += input.audio.samples_per_frame;
 }
 
 bool Context::save_state( const wchar_t* filename )
 {
-    rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
+    rtl::opencl::buffer& buffer = m_buffer_state[1 - m_buffer_state_output_index];
 
     rtl::vector<rtl::uint32_t> state( buffer.length(), 0 );
-    context.enqueue_copy( buffer, state.data(), buffer.length() );
-    context.wait();
+    m_context.enqueue_copy( buffer, state.data(), buffer.length() );
+    m_context.wait();
 
     // TODO: save to tmp file, than rename
     auto f
@@ -186,10 +187,10 @@ bool Context::load_state( const wchar_t* filename )
     if ( f.read( state.data(), bytes_to_read ) != bytes_to_read )
         return false;
 
-    rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
+    rtl::opencl::buffer& buffer = m_buffer_state[1 - m_buffer_state_output_index];
 
-    context.enqueue_copy( state.data(), buffer, buffer.length() );
-    context.wait();
+    m_context.enqueue_copy( state.data(), buffer, buffer.length() );
+    m_context.wait();
 
     return true;
 }
@@ -198,8 +199,8 @@ void Context::reset_state()
 {
     rtl::vector<rtl::uint32_t> state( state_buffer_size, 0 );
 
-    rtl::opencl::buffer& buffer = buffer_state[1 - buffer_state_output_index];
+    rtl::opencl::buffer& buffer = m_buffer_state[1 - m_buffer_state_output_index];
 
-    context.enqueue_copy( state.data(), buffer, buffer.length() );
-    context.wait();
+    m_context.enqueue_copy( state.data(), buffer, buffer.length() );
+    m_context.wait();
 }
