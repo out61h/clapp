@@ -550,7 +550,7 @@ public:
 };
 
 Settings::Settings()
-    : m_impl( new Impl ) // TODO: Implement rtl::make_unique
+    : m_impl( rtl::make_unique<Impl>() )
 {
 }
 

@@ -46,9 +46,8 @@ namespace ui
 }
 
 App::App()
+    : m_hud( rtl::make_unique<Hud>() )
 {
-    // TODO: rtl::make_unique
-    m_hud.reset( new Hud );
     show_help( true );
 }
 
@@ -101,8 +100,7 @@ bool App::setup( const rtl::application::environment& envir, rtl::application::p
 {
     if ( !m_settings )
     {
-        // TODO: rtl::make_unique
-        m_settings.reset( new Settings );
+        m_settings = rtl::make_unique<Settings>();
         m_settings->load( filenames::settings );
 
         if ( !m_settings->setup( nullptr, envir.display.framerate ) )
@@ -113,7 +111,8 @@ bool App::setup( const rtl::application::environment& envir, rtl::application::p
         if ( !m_settings->setup( envir.window_handle, envir.display.framerate ) )
             return false;
 
-        if ( m_context && m_settings->target_opencl_device().name() != m_context->opencl_device_name() )
+        if ( m_context
+             && m_settings->target_opencl_device().name() != m_context->opencl_device_name() )
         {
             // reset working context, if user selected another OpenCL device
             m_context->save_state( filenames::auto_save );
@@ -135,8 +134,7 @@ void App::init( const rtl::application::environment& envir, const rtl::applicati
     {
         // TODO: Compile source once and cache compiled binaries in the file.
         // TODO: Compile program in async manner, display status (progress???)
-        // TODO: rtl::make_unique
-        m_context.reset( new Context( m_settings->target_opencl_device() ) );
+        m_context = rtl::make_unique<Context>( m_settings->target_opencl_device() );
 #if !CLAPP_ENABLE_ARCHITECT_MODE
         auto program = envir.resources.open( FILE, CLAPP_ID_OPENCL_PROGRAM );
 
@@ -149,12 +147,10 @@ void App::init( const rtl::application::environment& envir, const rtl::applicati
         m_context->load_state( filenames::auto_save );
     }
 
-    // TODO: rtl::make_unique
     if ( !m_renderer )
-        m_renderer.reset( new Renderer() );
+        m_renderer = rtl::make_unique<Renderer>();
 
-    // TODO: rtl::make_unique
-    m_font.reset( new Font( ui::font_size( input.screen.width ) ) );
+    m_font = rtl::make_unique<Font>( ui::font_size( input.screen.width ) );
 
     m_hud->init( input.screen.width, input.screen.height );
     m_renderer->init( input.screen.width, input.screen.height );
