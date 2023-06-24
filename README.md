@@ -17,6 +17,6 @@ CLapp is a Windows application for launching generative audiovisual demos writte
 - [ ] Implement resolution downscaling (1:1, 1:2, 1:4, 1:8)
 - [ ] Update window content while moving (move rendering to thread?)
 - [ ] Handle display framerate changes (e.g. after moving window to another monitor)
-- [ ] Store files in user profile folder
+- [ ] Store files in the user's profile folder
 - [ ] Add support for 4K+ monitors
 - [ ] Resolve TODOs from code

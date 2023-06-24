@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <rtl/array.hpp>
 #include <rtl/chrono.hpp>
 #include <rtl/string.hpp>
 
@@ -26,6 +27,8 @@ namespace clapp
         void set_status( rtl::wstring_view text );
         void add_message( rtl::wstring_view text );
 
+        void set_stat_line( unsigned index, rtl::wstring_view text );
+
         void update( rtl::chrono::thirds clock );
         void draw( Font& font );
 
@@ -33,8 +36,11 @@ namespace clapp
         class Message final
         {
         public:
-            void set_text( rtl::wstring_view   text,
-                           rtl::chrono::thirds exposition_duration = rtl::chrono::thirds::zero() );
+            void animate_text( rtl::wstring_view   text,
+                               rtl::chrono::thirds exposition_duration
+                               = rtl::chrono::thirds::zero() );
+
+            void set_text( rtl::wstring_view text );
 
             void update( rtl::chrono::thirds time );
             void draw( Font& font, int x, int y );
@@ -61,8 +67,9 @@ namespace clapp
             float m_opacity_show { 0.f };
         };
 
-        Message m_status;
-        Message m_message;
+        Message                m_status;
+        Message                m_message;
+        rtl::array<Message, 5> m_stats;
 
         int m_screen_height { 0 };
     };

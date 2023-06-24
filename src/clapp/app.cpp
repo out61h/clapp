@@ -64,6 +64,22 @@ void App::toggle_help()
     show_help( !m_show_help );
 }
 
+void App::show_stats( bool show )
+{
+    m_show_stats = show;
+
+    if ( !m_show_stats )
+    {
+        m_hud->set_stat_line( 0, L"" );
+        m_hud->set_stat_line( 1, L"" );
+    }
+}
+
+void App::toggle_stats()
+{
+    show_stats( !m_show_stats );
+}
+
 void App::reset_state()
 {
     m_context->reset_state();
@@ -159,11 +175,34 @@ void App::init( const rtl::application::environment& envir, const rtl::applicati
 
 void App::update( const rtl::application::input& input, rtl::application::output& output )
 {
+    auto start = rtl::chrono::steady_clock::now();
+
+    rtl::chrono::microseconds ft = start - m_frame_start;
+
+    m_frame_start = rtl::chrono::steady_clock::now();
+
     m_context->update( input, output );
     m_hud->update( rtl::chrono::thirds( input.clock.third_ticks ) );
 
     m_renderer->draw();
     m_hud->draw( *m_font.get() );
+
+    auto end = rtl::chrono::steady_clock::now();
+
+    rtl::chrono::microseconds delta = end - start;
+    // process delta in ms
+
+    if ( m_show_stats )
+    {
+        m_hud->set_stat_line( 0,
+                              rtl::wstring( L"Render time:  " )
+                                  + rtl::to_wstring( delta.count() ) );
+        m_hud->set_stat_line( 1, rtl::wstring( L"Frame time:  " ) + rtl::to_wstring( ft.count() ) );
+
+        m_hud->set_stat_line( 2, rtl::wstring( L"Audio underruns: " ) );
+        m_hud->set_stat_line( 3, rtl::wstring( L"Audio overruns: " ) );
+        m_hud->set_stat_line( 4, rtl::wstring( L"Audio latency: " ) );
+    }
 }
 
 void App::clear()

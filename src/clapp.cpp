@@ -46,6 +46,7 @@ int main( int, char*[] )
         { g_app->init( envir, input ); },
         []( const application::input& input, application::output& output )
         {
+            // TODO: Handle via dispatcher
             if ( input.keys.pressed[keys::escape] )
             {
                 return application::action::close;
@@ -71,6 +72,10 @@ int main( int, char*[] )
             else if ( input.keys.pressed[keys::f8] && input.keys.state[keys::control] )
             {
                 g_app->reset_state();
+            }
+            else if ( input.keys.pressed[keys::f9] )
+            {
+                g_app->toggle_stats();
             }
             else if ( input.keys.pressed[keys::f10] )
             {

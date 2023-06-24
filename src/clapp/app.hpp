@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <rtl/chrono.hpp>
 #include <rtl/memory.hpp>
 #include <rtl/sys/application.hpp>
 
@@ -37,6 +38,9 @@ namespace clapp
         void show_help( bool show );
         void toggle_help();
 
+        void show_stats( bool show );
+        void toggle_stats();
+
         void reset_state();
         void load_state();
         void save_state();
@@ -50,7 +54,10 @@ namespace clapp
         rtl::unique_ptr<Font>     m_font;
         rtl::unique_ptr<Context>  m_context;
 
-        bool m_show_help { true };
-        bool m_pad[3] { 0 };
+        rtl::chrono::steady_clock::time_point m_frame_start;
+
+        bool m_show_help { false };
+        bool m_show_stats { false };
+        bool m_pad[2];
     };
 }

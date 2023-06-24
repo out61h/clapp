@@ -27,27 +27,27 @@ find_package(rtl REQUIRED)
 aux_source_directory(src/ SOURCES)
 aux_source_directory(src/clapp SOURCES)
 
-add_executable(${PROJECT_NAME} 
+add_executable(${PROJECT_NAME}
     ${CMAKE_CURRENT_LIST_DIR}/res/clapp.rc
     ${SOURCES}
 )
 
-add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/res/cl )
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/res/cl)
 
-target_link_libraries(${PROJECT_NAME} 
-        ${OpenCL_LIBRARIES} 
+target_link_libraries(${PROJECT_NAME}
+        ${OpenCL_LIBRARIES}
         rtl::rtl
         winmm 
         opengl32)
 
-target_include_directories(${PROJECT_NAME} 
+target_include_directories(${PROJECT_NAME}
     PRIVATE
         src
         res
         ${OpenCL_INCLUDE_DIRS}
 )
 
-if( MSVC )
+if(MSVC)
     RemoveDebugCXXFlag("/RTC1")
     RemoveCXXFlag("/EHsc")
     message("MSVC flags: ${CMAKE_CXX_FLAGS}")
@@ -72,7 +72,7 @@ if( MSVC )
             RTL_ENABLE_APP_CLOCK=1
             RTL_ENABLE_APP_CURSOR=1
             RTL_ENABLE_APP_FULLSCREEN=0
-            RTL_ENABLE_APP_KEYS=1            
+            RTL_ENABLE_APP_KEYS=1
             RTL_ENABLE_APP_OSD=0
             RTL_ENABLE_APP_OPENGL=1
             RTL_ENABLE_APP_OPENGL_VSYNC=1
@@ -81,6 +81,7 @@ if( MSVC )
             RTL_ENABLE_APP_RESOURCES=1
             RTL_ENABLE_APP_SCREEN_BUFFER=0
             RTL_ENABLE_APP_SINGLETON=1
+            RTL_ENABLE_CHRONO_CLOCK=1
             RTL_ENABLE_HEAP=1
             RTL_ENABLE_MEMSET=0
             RTL_ENABLE_OPENCL=1
