@@ -26,28 +26,54 @@ void Hud::init( int /* screen_width */, int screen_height )
 
 void Hud::set_status( rtl::wstring_view text )
 {
-    m_status.set_text( text );
+    m_status.animate_text( text );
 }
 
 void Hud::add_message( rtl::wstring_view text )
 {
-    m_message.set_text( text, timings::exposition );
+    m_message.animate_text( text, timings::exposition );
+}
+
+void Hud::set_stat_line( unsigned index, rtl::wstring_view text )
+{
+    m_stats[index].set_text( text );
 }
 
 void Hud::update( rtl::chrono::thirds time )
 {
     m_status.update( time );
     m_message.update( time );
+
+    for ( auto& stat : m_stats )
+        stat.update( time );
 }
 
 void Hud::draw( Font& font )
 {
     m_status.draw( font, font.size(), font.size() );
     m_message.draw( font, font.size(), m_screen_height - font.size() );
+
+    int line = 4;
+    for ( auto& stat : m_stats )
+        stat.draw( font, font.size() * 2, m_screen_height - font.size() * line++ );
 }
 
-void Hud::Message::set_text( rtl::wstring_view text, rtl::chrono::thirds exposition_duration )
+void Hud::Message::set_text( rtl::wstring_view text )
 {
+    text_to_hide = rtl::move( text_to_show );
+    text_to_show = text;
+
+    m_opacity_hide = 0.f;
+    m_opacity_show = 1.f;
+
+    m_state = State::Idle;
+}
+
+void Hud::Message::animate_text( rtl::wstring_view text, rtl::chrono::thirds exposition_duration )
+{
+    if ( text_to_show == text )
+        return;
+
     text_to_hide = rtl::move( text_to_show );
     text_to_show = text;
 
