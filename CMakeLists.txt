@@ -29,9 +29,8 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/res/cl)
 set_target_properties(${PROJECT_NAME}
     PROPERTIES
         RTL_ENABLE_APP ON
-        RTL_ENABLE_APP_AUDIO ON
+        RTL_ENABLE_APP_AUDIO_OUTPUT ON
         RTL_ENABLE_APP_CLOCK ON
-        RTL_ENABLE_APP_CURSOR ON
         RTL_ENABLE_APP_KEYS ON
         RTL_ENABLE_APP_OPENGL ON
         RTL_ENABLE_APP_OPENGL_VSYNC ON
@@ -53,8 +52,6 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         ${OpenCL_LIBRARIES}
         rtl::rtl
-        winmm
-        opengl32
 )
 
 target_include_directories(${PROJECT_NAME}
