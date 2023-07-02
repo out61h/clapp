@@ -56,7 +56,7 @@ void Context::load_program( rtl::string_view source )
     m_kernel_audio_out = m_program.create_kernel( "main_audio_out" );
 }
 
-void Context::init( [[maybe_unused]] const rtl::application::input& input, unsigned gl_texture )
+void Context::init( [[maybe_unused]] const rtl::Application::Input& input, unsigned gl_texture )
 {
     m_audio_data_left.resize( input.audio.samples_per_frame );
     m_audio_data_right.resize( input.audio.samples_per_frame );
@@ -67,8 +67,8 @@ void Context::init( [[maybe_unused]] const rtl::application::input& input, unsig
     m_buffer_video = m_context.create_buffer_2d_from_ogl_texture( gl_texture );
 }
 
-void Context::update( [[maybe_unused]] const rtl::application::input& input,
-                      [[maybe_unused]] rtl::application::output&      output )
+void Context::update( [[maybe_unused]] const rtl::Application::Input& input,
+                      [[maybe_unused]] rtl::Application::Output&      output )
 {
     m_context.enqueue_copy( input.keys.state, m_buffer_keys, m_buffer_keys.length() );
 
@@ -132,7 +132,7 @@ void Context::update( [[maybe_unused]] const rtl::application::input& input,
     // TODO: convert sample format inside audio kernel
     constexpr float max_int16 = (float)rtl::numeric_limits<rtl::int16_t>::max();
 
-    rtl::int16_t* samples = input.audio.frame;
+    rtl::int16_t* samples = input.audio.output_frame_pointer;
 
     for ( size_t i = 0; i < input.audio.samples_per_frame; ++i )
     {

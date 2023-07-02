@@ -112,7 +112,7 @@ void App::reload_program()
     m_hud->add_message( L"Program loaded successfully." );
 }
 
-bool App::setup( const rtl::application::environment& envir, rtl::application::params& params )
+bool App::setup( const rtl::Application::Environment& envir, rtl::Application::Params& params )
 {
     if ( !m_settings )
     {
@@ -142,7 +142,7 @@ bool App::setup( const rtl::application::environment& envir, rtl::application::p
     return true;
 }
 
-void App::init( const rtl::application::environment& envir, const rtl::application::input& input )
+void App::init( const rtl::Application::Environment& envir, const rtl::Application::Input& input )
 {
     // NOTE: class \Context depends on OpenGL context, so we should initialize it
     // in \on_init callback which is called after OpenGL context was initialized.
@@ -173,7 +173,7 @@ void App::init( const rtl::application::environment& envir, const rtl::applicati
     m_context->init( input, m_renderer->texture() );
 }
 
-void App::update( const rtl::application::input& input, rtl::application::output& output )
+void App::update( const rtl::Application::Input& input, rtl::Application::Output& output )
 {
     auto start = rtl::chrono::steady_clock::now();
 

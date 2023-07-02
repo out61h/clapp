@@ -22,8 +22,8 @@ namespace clapp
         explicit Context( const rtl::opencl::device& device );
         ~Context() = default;
 
-        void init( const rtl::application::input& input, unsigned gl_texture );
-        void update( const rtl::application::input& input, rtl::application::output& output );
+        void init( const rtl::Application::Input& input, unsigned gl_texture );
+        void update( const rtl::Application::Input& input, rtl::Application::Output& output );
 
         void load_program( const wchar_t* filename );
         void load_program( rtl::string_view program );

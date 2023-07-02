@@ -13,7 +13,7 @@
 
 #include <clapp/app.hpp>
 
-using rtl::application;
+using rtl::Application;
 using namespace rtl::keyboard;
 
 using clapp::App;
@@ -22,7 +22,7 @@ using clapp::App;
 // TODO: Implement rtl::function template to make possible to pass lambdas with capture list to RTL
 // TODO: Use rtl::unique_ptr
 static App*                g_app { nullptr };
-static application::params g_app_params { 0 };
+static Application::Params g_app_params { 0 };
 
 // TODO: Fix sound sluttering after window resize or move
 int main( int, char*[] )
@@ -30,9 +30,9 @@ int main( int, char*[] )
     // TODO: Remember fullscreen state
     // TODO: Choose fullscreen or windowed mode with predefined size via setup
     // TODO: Support for fixed size or resizable windowed modes
-    application::instance().run(
+    Application::instance().run(
         L"CLapp",
-        []( const application::environment& envir, application::params& params )
+        []( const Application::Environment& envir, Application::Params& params )
         {
             if ( !g_app )
                 g_app = new App;
@@ -42,24 +42,24 @@ int main( int, char*[] )
 
             return true;
         },
-        []( const application::environment& envir, const application::input& input )
+        []( const Application::Environment& envir, const Application::Input& input )
         { g_app->init( envir, input ); },
-        []( const application::input& input, application::output& output )
+        []( const Application::Input& input, Application::Output& output )
         {
             // TODO: Handle via dispatcher
-            if ( input.keys.pressed[keys::escape] )
+            if ( input.keys.pressed[Keys::escape] )
             {
-                return application::action::close;
+                return Application::Action::close;
             }
-            else if ( input.keys.pressed[keys::f1] )
+            else if ( input.keys.pressed[Keys::f1] )
             {
                 g_app->toggle_help();
             }
-            else if ( input.keys.pressed[keys::f2] )
+            else if ( input.keys.pressed[Keys::f2] )
             {
                 g_app->save_state();
             }
-            else if ( input.keys.pressed[keys::f3] )
+            else if ( input.keys.pressed[Keys::f3] )
             {
                 g_app->load_state();
             }
@@ -69,35 +69,36 @@ int main( int, char*[] )
                 g_app->reload_program();
             }
 #endif
-            else if ( input.keys.pressed[keys::f8] && input.keys.state[keys::control] )
+            else if ( input.keys.pressed[Keys::f8] && input.keys.state[Keys::control] )
             {
                 g_app->reset_state();
             }
-            else if ( input.keys.pressed[keys::f9] )
+            else if ( input.keys.pressed[Keys::f9] )
             {
                 g_app->toggle_stats();
             }
-            else if ( input.keys.pressed[keys::f10] )
+            else if ( input.keys.pressed[Keys::f10] )
             {
                 // NOTE: We fill application window with background color to prevent flickering
                 // after the settings dialog appearing
                 g_app->clear();
 
-                return application::action::reset;
+                return Application::Action::reset;
             }
 #if RTL_ENABLE_APP_RESIZE
-            else if ( input.keys.pressed[keys::f11] )
+            else if ( input.keys.pressed[Keys::f11] )
             {
-                return application::action::toggle_fullscreen;
+                return Application::Action::toggle_fullscreen;
             }
 #endif
             g_app->update( input, output );
-            return application::action::none;
+            return Application::Action::none;
         },
         []()
         {
             g_app->shutdown();
             delete g_app;
+            g_app = nullptr;
         } );
 
     return 0;

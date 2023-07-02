@@ -28,10 +28,10 @@ namespace clapp
         App();
         ~App();
 
-        bool setup( const rtl::application::environment& envir, rtl::application::params& params );
-        void init( const rtl::application::environment& envir,
-                   const rtl::application::input&       input );
-        void update( const rtl::application::input& input, rtl::application::output& output );
+        bool setup( const rtl::Application::Environment& envir, rtl::Application::Params& params );
+        void init( const rtl::Application::Environment& envir,
+                   const rtl::Application::Input&       input );
+        void update( const rtl::Application::Input& input, rtl::Application::Output& output );
         void clear();
         void shutdown();
 
